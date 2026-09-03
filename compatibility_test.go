@@ -217,20 +217,17 @@ func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
 			t.Errorf("Normalize(%+v) returned invalid (confidence=%s, source=%s) — sample should be valid", in, result.Confidence, result.MappingSource)
 			continue
 		}
-		if !validTypes[result.OvaholType] {
-			t.Errorf("Normalize(%+v).OvaholType %q invalid", in, result.OvaholType)
+		if !validTypes[result.DeviceType] {
+			t.Errorf("Normalize(%+v).DeviceType %q invalid", in, result.DeviceType)
 		}
-		if !validFuncs[result.Function] {
-			t.Errorf("Normalize(%+v).Function %q invalid", in, result.Function)
+		if !validFuncs[result.DeviceFunction] {
+			t.Errorf("Normalize(%+v).DeviceFunction %q invalid", in, result.DeviceFunction)
 		}
-		if !validRisks[result.Risk] {
-			t.Errorf("Normalize(%+v).Risk %q invalid", in, result.Risk)
+		if !validRisks[result.DeviceApplicationRisk] {
+			t.Errorf("Normalize(%+v).DeviceApplicationRisk %q invalid", in, result.DeviceApplicationRisk)
 		}
-		if result.CommonName == "" {
-			t.Errorf("Normalize(%+v) empty CommonName", in)
-		}
-		if result.CanonicalName == "" {
-			t.Errorf("Normalize(%+v) empty CanonicalName", in)
+		if result.Name == "" {
+			t.Errorf("Normalize(%+v) empty Name", in)
 		}
 		if result.MappingSource == "" {
 			t.Errorf("Normalize(%+v) empty MappingSource", in)
@@ -246,7 +243,7 @@ func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
 	for _, dt := range OvaholDeviceTypes {
 		validTypes[dt.Name] = true
 	}
-	// Inputs whose CommonName would ideally be vendor-neutral. The library
+	// Inputs whose Name would ideally be vendor-neutral. The library
 	// does best-effort humanization but may retain some vendor tokens for
 	// highly vendor-specific names — that's a known improvement area, not a
 	// compatibility break. We verify only that the controlled fields don't leak.
@@ -261,12 +258,12 @@ func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
 			t.Errorf("Normalize(%+v) unexpectedly invalid", in)
 			continue
 		}
-		if !validTypes[result.OvaholType] {
-			t.Errorf("Normalize(%+v) leaked free text into OvaholType: %q", in, result.OvaholType)
+		if !validTypes[result.DeviceType] {
+			t.Errorf("Normalize(%+v) leaked free text into DeviceType: %q", in, result.DeviceType)
 		}
-		// Controlled fields must be valid, but CommonName may retain descriptive tokens
-		if result.CommonName == "" {
-			t.Errorf("Normalize(%+v) empty CommonName", in)
+		// Controlled fields must be valid, but Name may retain descriptive tokens
+		if result.Name == "" {
+			t.Errorf("Normalize(%+v) empty Name", in)
 		}
 	}
 }
@@ -295,16 +292,15 @@ func TestCompatibility_JSONInterchangeRoundTrips(t *testing.T) {
 		t.Fatalf("round-trip length mismatch: %d vs %d", len(decoded), len(results))
 	}
 	for i, r := range decoded {
-		if r.OvaholType != results[i].OvaholType {
-			t.Errorf("round-trip [%d] OvaholType mismatch: %q vs %q", i, r.OvaholType, results[i].OvaholType)
+		if r.DeviceType != results[i].DeviceType {
+			t.Errorf("round-trip [%d] DeviceType mismatch: %q vs %q", i, r.DeviceType, results[i].DeviceType)
 		}
 	}
 }
 
 func TestCompatibility_CSVAndAPIImportHeaders(t *testing.T) {
 	wantSheetHeaders := []string{
-		"Common name", "Canonical device name", "Search aliases",
-		"Ovahol device type", "Ovahol device family", "Device function",
+		"Name", "Device type", "Device category", "Device function",
 		"Device application risk", "Legacy source name", "Source device type",
 		"EMDN code", "EMDN term",
 	}
@@ -316,7 +312,7 @@ func TestCompatibility_CSVAndAPIImportHeaders(t *testing.T) {
 			t.Errorf("DeviceSheetHeaders[%d] = %q, want %q", i, DeviceSheetHeaders[i], want)
 		}
 	}
-	wantAPIHeaders := []string{"name", "device_type", "device_function", "device_application_risk", "emdn_code", "emdn_term"}
+	wantAPIHeaders := []string{"name", "device_type", "device_category", "device_function", "device_application_risk", "emdn_code", "emdn_term"}
 	if len(APIImportHeaders) != len(wantAPIHeaders) {
 		t.Fatalf("APIImportHeaders length %d, want %d", len(APIImportHeaders), len(wantAPIHeaders))
 	}
