@@ -62,13 +62,11 @@ func main() {
 
 func printResult(r ontology.Result) {
 	fmt.Printf("  Input:    %q (%s)\n", r.LegacySourceName, r.SourceType)
-	fmt.Printf("  Common:   %s\n", r.CommonName)
-	fmt.Printf("  Canonical:%s\n", r.CanonicalName)
-	fmt.Printf("  Aliases:  %s\n", r.SearchAliases)
-	fmt.Printf("  Type:     %s\n", r.OvaholType)
-	fmt.Printf("  Family:   %s\n", r.Family)
-	fmt.Printf("  Function: %s\n", r.Function)
-	fmt.Printf("  Risk:     %s\n", r.Risk)
+	fmt.Printf("  Name:     %s\n", r.Name)
+	fmt.Printf("  Type:     %s\n", r.DeviceType)
+	fmt.Printf("  Category: %s\n", r.DeviceCategory)
+	fmt.Printf("  Function: %s\n", r.DeviceFunction)
+	fmt.Printf("  Risk:     %s\n", r.DeviceApplicationRisk)
 	fmt.Printf("  Source:   %s (confidence: %s)\n", r.MappingSource, r.Confidence)
 }
 

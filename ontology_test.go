@@ -6,7 +6,7 @@ func TestNormalize(t *testing.T) {
 	tests := []struct {
 		name string
 		in   Input
-		want string // expected OvaholType
+		want string // expected DeviceType
 	}{
 		{
 			name: "ECG via monitoring equipment",
@@ -42,8 +42,8 @@ func TestNormalize(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := Normalize(tc.in)
-			if result.OvaholType != tc.want {
-				t.Errorf("Normalize(%+v) OvaholType = %q, want %q (full result: %+v)", tc.in, result.OvaholType, tc.want, result)
+			if result.DeviceType != tc.want {
+				t.Errorf("Normalize(%+v) DeviceType = %q, want %q (full result: %+v)", tc.in, result.DeviceType, tc.want, result)
 			}
 			if tc.want == "" && result.IsValid() {
 				t.Errorf("expected invalid result for unsupported source type, got valid: %+v", result)
@@ -86,8 +86,8 @@ func TestNormalizeJSON(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if results[0].OvaholType != "Monitoring & Measurement Devices" {
-		t.Errorf("unexpected type: %q", results[0].OvaholType)
+	if results[0].DeviceType != "Monitoring & Measurement Devices" {
+		t.Errorf("unexpected type: %q", results[0].DeviceType)
 	}
 }
 
@@ -119,8 +119,8 @@ func TestToCSV(t *testing.T) {
 }
 
 func TestLookupVocabulary(t *testing.T) {
-	if len(OvaholDeviceTypes) != 8 {
-		t.Errorf("expected 8 device types, got %d", len(OvaholDeviceTypes))
+	if len(DeviceTypes) != 8 {
+		t.Errorf("expected 8 device types, got %d", len(DeviceTypes))
 	}
 	if len(DeviceFunctions) != 9 {
 		t.Errorf("expected 9 device functions, got %d", len(DeviceFunctions))
@@ -137,4 +137,56 @@ func TestValidateInput(t *testing.T) {
 	if err := ValidateInput(Input{DeviceName: "something"}); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
+}
+
+func TestAgnosticJSONFields(t *testing.T) {
+	r := Normalize(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"})
+	if r.Name == "" {
+		t.Error("expected non-empty Name")
+	}
+	if r.DeviceType == "" {
+		t.Error("expected non-empty DeviceType")
+	}
+	if r.DeviceCategory == "" {
+		t.Error("expected non-empty DeviceCategory")
+	}
+	if r.DeviceFunction == "" {
+		t.Error("expected non-empty DeviceFunction")
+	}
+	// Ensure legacy keys not present, streamlined keys present
+	data, _ := ToJSON([]Result{r})
+	s := string(data)
+	if contains(s, "\"ovahol_device_type\"") || contains(s, "\"ovahol_device_family\"") || contains(s, "\"common_name\":") || contains(s, "\"device_family\"") {
+		t.Errorf("JSON still contains legacy keys: %s", s)
+	}
+	if !contains(s, "\"name\"") || !contains(s, "\"device_type\"") || !contains(s, "\"device_category\"") || !contains(s, "\"device_function\"") || !contains(s, "\"device_application_risk\"") {
+		t.Errorf("JSON missing streamlined keys: %s", s)
+	}
+}
+
+func TestStreamlinedFields(t *testing.T) {
+	r := Normalize(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"})
+	if r.DeviceType != "Treatment, Surgical & Life Support Devices" {
+		t.Errorf("unexpected DeviceType: %q", r.DeviceType)
+	}
+	if r.DeviceCategory != "Therapeutic" {
+		t.Errorf("expected Therapeutic category, got %q", r.DeviceCategory)
+	}
+	if r.DeviceFunction == "" || r.DeviceApplicationRisk == "" {
+		t.Errorf("expected function/risk, got %q / %q", r.DeviceFunction, r.DeviceApplicationRisk)
+	}
+	if r.DeviceApplication != r.DeviceFunction {
+		t.Errorf("DeviceApplication alias mismatch: %q vs %q", r.DeviceApplication, r.DeviceFunction)
+	}
+}
+
+func contains(s, substr string) bool {
+	return len(s) >= len(substr) && (func() bool {
+		for i := 0; i <= len(s)-len(substr); i++ {
+			if s[i:i+len(substr)] == substr {
+				return true
+			}
+		}
+		return false
+	})()
 }

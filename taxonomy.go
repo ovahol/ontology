@@ -2,8 +2,8 @@
 //
 // This file is generated from scripts/update_ovahol_ontology.py. The
 // standalone library vendors the vocabulary statically so it has no
-// dependency on the Ovahol monorepo's seed/lookup package. To regenerate,
-// run `go generate` or re-run the Python generator and copy the output.
+// external dependency. To regenerate, run `go generate` or re-run the
+// Python generator and copy the output.
 package ontology
 
 // DeviceType is one of Ovahol's 8 canonical device types.
@@ -26,8 +26,8 @@ type DeviceApplicationRisk struct {
 	ScorePoint  int    `json:"score_point"`
 }
 
-// OvaholDeviceTypes is the canonical list of 8 Ovahol device types.
-var OvaholDeviceTypes = []DeviceType{
+// DeviceTypes is the canonical list of 8 device types.
+var DeviceTypes = []DeviceType{
 	{Name: "Monitoring & Measurement Devices", Code: "MONITORING_MEASUREMENT_DEVICES"},
 	{Name: "Diagnostic & Imaging Devices", Code: "DIAGNOSTIC_IMAGING_DEVICES"},
 	{Name: "Treatment, Surgical & Life Support Devices", Code: "TREATMENT_SURGICAL_LIFE_SUPPORT_DEVICES"},
@@ -60,6 +60,20 @@ var DeviceApplicationRisks = []DeviceApplicationRisk{
 	{Description: "No significant identified risk", ScorePoint: 1},
 }
 
+// DeviceCategory is one of the 4 high-level device categories.
+type DeviceCategory struct {
+	Name string `json:"name"`
+	Code string `json:"code"`
+}
+
+// DeviceCategories is the canonical list of 4 device categories.
+var DeviceCategories = []DeviceCategory{
+	{Name: "Therapeutic", Code: "THERAPEUTIC"},
+	{Name: "Diagnostic", Code: "DIAGNOSTIC"},
+	{Name: "Analytical", Code: "ANALYTICAL"},
+	{Name: "Miscellaneous", Code: "MISCELLANEOUS"},
+}
+
 // NamingRule mirrors Python NAMING_RULES
 type NamingRule struct { Field, Rule, GoodExample, Avoid string }
 
@@ -74,11 +88,9 @@ var NamingRules = []NamingRule{
 }
 
 var DeviceSheetHeaders = []string{
-"Common name",
-"Canonical device name",
-"Search aliases",
-"Ovahol device type",
-"Ovahol device family",
+"Name",
+"Device type",
+"Device category",
 "Device function",
 "Device application risk",
 "Legacy source name",
@@ -90,6 +102,7 @@ var DeviceSheetHeaders = []string{
 var APIImportHeaders = []string{
 "name",
 "device_type",
+"device_category",
 "device_function",
 "device_application_risk",
 "emdn_code",
@@ -185,7 +198,7 @@ var LegacyDescriptorPhrases = map[string]struct{}{
 "sterile": {},
 }
 
-// FamilyRule defines an Ovahol family grouping rule
+// FamilyRule defines a device family grouping rule
 type FamilyRule struct {
 Type string
 Family string
@@ -198,6 +211,41 @@ Keywords []string
 }
 
 var FamilyRules = []FamilyRule{
+// Function/Risk overrides paired with the SpecificNameRule Type overrides
+// above, for devices.csv names whose correct Function/Risk isn't the
+// DeviceTypeDefaults default for their Type.
+{Type: "Diagnostic & Imaging Devices", Family: "Imaging workflow and visualization accessories", CommonName: "Multi-syringe contrast media injector", CanonicalName: "Multi-syringe contrast media injector", Function: "Surgical and Intensive Care Monitoring", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"multi syringe contrast media injector"}},
+{Type: "Diagnostic & Imaging Devices", Family: "Angiography and catheterization imaging systems", CommonName: "Cardiac catheterization laboratory system", CanonicalName: "Cardiac catheterization laboratory system", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"cardiac catheterization laboratory system"}},
+{Type: "Treatment, Surgical & Life Support Devices", Family: "Sample preparation and laboratory support", CommonName: "CO2 blood gas electrode", CanonicalName: "CO2 blood gas electrode", Function: "Analytical Laboratory", Risk: "Inappropriate therapy or misdiagnosis", SourceTypes: []string{}, Keywords: []string{"co2 blood gas electrode"}},
+{Type: "Laboratory & IVD Equipment", Family: "General laboratory support equipment", CommonName: "Diagnostic instrument monitor card", CanonicalName: "Diagnostic instrument monitor card", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"diagnostic instrument monitor card"}},
+{Type: "Treatment, Surgical & Life Support Devices", Family: "Dialysis and extracorporeal therapy systems", CommonName: "Extracorporeal membrane oxygenation (ECMO)", CanonicalName: "Extracorporeal membrane oxygenation (ECMO)", Function: "Life Support", Risk: "Potential patient death", SourceTypes: []string{}, Keywords: []string{"extracorporeal membrane oxygenation ecmo"}},
+{Type: "Laboratory & IVD Equipment", Family: "General laboratory support equipment", CommonName: "Medical label / report printer", CanonicalName: "Medical label / report printer", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"medical label report printer"}},
+{Type: "Medical Gas & Respiratory Devices", Family: "Oxygen supply systems", CommonName: "MRI-compatible oxygen canister", CanonicalName: "MRI-compatible oxygen canister", Function: "Life Support", Risk: "Potential patient death", SourceTypes: []string{}, Keywords: []string{"mri compatible oxygen canister"}},
+{Type: "Treatment, Surgical & Life Support Devices", Family: "Infusion and medication delivery systems", CommonName: "Parenteral / enteral solution bag", CanonicalName: "Parenteral / enteral solution bag", Function: "Life Support", Risk: "Potential patient death", SourceTypes: []string{}, Keywords: []string{"parenteral enteral solution bag"}},
+{Type: "Laboratory & IVD Equipment", Family: "Sample preparation and laboratory support", CommonName: "RNA/DNA extraction system", CanonicalName: "RNA/DNA extraction system", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"rna dna extraction system"}},
+{Type: "Laboratory & IVD Equipment", Family: "General laboratory support equipment", CommonName: "Blood bag scale", CanonicalName: "Blood bag scale", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"blood bag scale"}},
+{Type: "Laboratory & IVD Equipment", Family: "Sample preparation and laboratory support", CommonName: "Blood collection pipette", CanonicalName: "Blood collection pipette", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"blood collection pipette"}},
+{Type: "Laboratory & IVD Equipment", Family: "Laboratory containers and disposables", CommonName: "Capillary blood tube", CanonicalName: "Capillary blood tube", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"capillary blood tube"}},
+{Type: "Laboratory & IVD Equipment", Family: "Laboratory containers and disposables", CommonName: "Cell culture tube", CanonicalName: "Cell culture tube", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"cell culture tube"}},
+{Type: "Laboratory & IVD Equipment", Family: "General laboratory support equipment", CommonName: "Cotton applicator sticks", CanonicalName: "Cotton applicator sticks", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"cotton applicator sticks"}},
+{Type: "Monitoring & Measurement Devices", Family: "Critical care monitoring systems", CommonName: "CT display monitor", CanonicalName: "CT display monitor", Function: "Surgical and Intensive Care Monitoring", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"ct display monitor"}},
+{Type: "Diagnostic & Imaging Devices", Family: "General surgical and interventional instruments", CommonName: "Diagnostic examination set", CanonicalName: "Diagnostic examination set", Function: "Additional Physiological Monitoring and Diagnostic", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"diagnostic examination set"}},
+{Type: "Monitoring & Measurement Devices", Family: "Critical care monitoring systems", CommonName: "Dialysis central monitor", CanonicalName: "Dialysis central monitor", Function: "Surgical and Intensive Care Monitoring", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"dialysis central monitor"}},
+{Type: "Diagnostic & Imaging Devices", Family: "Imaging, ophthalmic, and procedural consumables", CommonName: "Fiducial marker (radiotherapy)", CanonicalName: "Fiducial marker (radiotherapy)", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"fiducial marker radiotherapy"}},
+{Type: "Support Equipment & Furniture", Family: "Medical furniture and fixtures", CommonName: "Fixed surgical light", CanonicalName: "Fixed surgical light", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"fixed surgical light"}},
+{Type: "Laboratory & IVD Equipment", Family: "General laboratory support equipment", CommonName: "Hot air sterilizer", CanonicalName: "Hot air sterilizer", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"hot air sterilizer"}},
+{Type: "Support Equipment & Furniture", Family: "Medical furniture and fixtures", CommonName: "Mobile surgical light", CanonicalName: "Mobile surgical light", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"mobile surgical light"}},
+{Type: "Monitoring & Measurement Devices", Family: "Therapeutic energy systems", CommonName: "Nd: Yag laser", CanonicalName: "Nd: Yag laser", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"nd yag laser"}},
+{Type: "Monitoring & Measurement Devices", Family: "Airway gas monitoring accessories", CommonName: "Respiratory gas monitor", CanonicalName: "Respiratory gas monitor", Function: "Surgical and Intensive Care Monitoring", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"respiratory gas monitor"}},
+{Type: "Consumables & Accessories", Family: "Laboratory storage and thermal equipment", CommonName: "Specimen warming cabinet", CanonicalName: "Specimen warming cabinet", Function: "Laboratory Accessories", Risk: "Inappropriate therapy or misdiagnosis", SourceTypes: []string{}, Keywords: []string{"specimen warming cabinet"}},
+{Type: "Diagnostic & Imaging Devices", Family: "Suction and aspiration systems", CommonName: "Surgery suction system", CanonicalName: "Surgery suction system", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"surgery suction system"}},
+{Type: "Laboratory & IVD Equipment", Family: "Laboratory containers and disposables", CommonName: "Test tube rack", CanonicalName: "Test tube rack", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"test tube rack"}},
+{Type: "Monitoring & Measurement Devices", Family: "Therapeutic energy systems", CommonName: "Argon laser", CanonicalName: "Argon laser", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"argon laser"}},
+{Type: "Laboratory & IVD Equipment", Family: "Laboratory safety cabinets and hoods", CommonName: "Biosafety cabinet", CanonicalName: "Biosafety cabinet", Function: "Laboratory Accessories", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"biosafety cabinet"}},
+{Type: "Laboratory & IVD Equipment", Family: "General laboratory support equipment", CommonName: "Hybridization incubator", CanonicalName: "Hybridization incubator", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"hybridization incubator"}},
+{Type: "Consumables & Accessories", Family: "Injection and infusion supplies", CommonName: "Intravenous line", CanonicalName: "Intravenous line", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"intravenous line"}},
+{Type: "Support Equipment & Furniture", Family: "Medical furniture and fixtures", CommonName: "Surgical light", CanonicalName: "Surgical light", Function: "Surgical and Intensive Care", Risk: "Potential patient or operator injury", SourceTypes: []string{}, Keywords: []string{"surgical light"}},
+{Type: "Laboratory & IVD Equipment", Family: "Laboratory containers and disposables", CommonName: "Funnel", CanonicalName: "Funnel", Function: "Laboratory Accessories", Risk: "Equipment damage", SourceTypes: []string{}, Keywords: []string{"funnel"}},
 {Type: "Monitoring & Measurement Devices", Family: "Critical care monitoring systems", CommonName: "Patient monitor", CanonicalName: "Multiparameter patient monitoring system", Function: "Surgical and Intensive Care Monitoring", Risk: "Potential patient or operator injury", SourceTypes: []string{"monitoring equipment"}, Keywords: []string{"monitor", "telemetry", "transducer", "vital signs"}},
 {Type: "Monitoring & Measurement Devices", Family: "Cardiac diagnostic systems", CommonName: "ECG machine", CanonicalName: "Electrocardiography system", Function: "Additional Physiological Monitoring and Diagnostic", Risk: "Inappropriate therapy or misdiagnosis", SourceTypes: []string{}, Keywords: []string{"ecg", "ekg", "holter"}},
 {Type: "Monitoring & Measurement Devices", Family: "Neurophysiology monitoring systems", CommonName: "EEG machine", CanonicalName: "Electroencephalography system", Function: "Additional Physiological Monitoring and Diagnostic", Risk: "Inappropriate therapy or misdiagnosis", SourceTypes: []string{}, Keywords: []string{"eeg", "electroencephalograph", "photostimulator"}},
@@ -317,6 +365,71 @@ Family string
 }
 
 var SpecificNameRules = []SpecificNameRule{
+// The following overrides pin exact Ovahol device dictionary names to their
+// production Type (see devices.csv) so keyword inference can't outvote them.
+// Ordered longest-keyword-first so multi-word overrides aren't shadowed by
+// shorter overrides later in this block (e.g. "Fixed surgical light" before
+// "Surgical light").
+{Keywords: []string{"blood glucose meter point of care"}, ExcludeKeywords: []string{}, CommonName: "Blood glucose meter (point-of-care)", CanonicalName: "Blood glucose meter (point-of-care)", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"point of care pt inr analyzer"}, ExcludeKeywords: []string{}, CommonName: "Point-of-care pt / inr analyzer", CanonicalName: "Point-of-care pt / inr analyzer", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"in situ hybridization staining platform"}, ExcludeKeywords: []string{}, CommonName: "In situ hybridization staining platform", CanonicalName: "In situ hybridization staining platform", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"multi syringe contrast media injector"}, ExcludeKeywords: []string{}, CommonName: "Multi-syringe contrast media injector", CanonicalName: "Multi-syringe contrast media injector", Type: "Diagnostic & Imaging Devices"},
+{Keywords: []string{"cardiac catheterization laboratory system"}, ExcludeKeywords: []string{}, CommonName: "Cardiac catheterization laboratory system", CanonicalName: "Cardiac catheterization laboratory system", Type: "Diagnostic & Imaging Devices"},
+{Keywords: []string{"co2 blood gas electrode"}, ExcludeKeywords: []string{}, CommonName: "CO2 blood gas electrode", CanonicalName: "CO2 blood gas electrode", Type: "Treatment, Surgical & Life Support Devices"},
+{Keywords: []string{"diagnostic instrument monitor card"}, ExcludeKeywords: []string{}, CommonName: "Diagnostic instrument monitor card", CanonicalName: "Diagnostic instrument monitor card", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"extracorporeal membrane oxygenation ecmo"}, ExcludeKeywords: []string{}, CommonName: "Extracorporeal membrane oxygenation (ECMO)", CanonicalName: "Extracorporeal membrane oxygenation (ECMO)", Type: "Treatment, Surgical & Life Support Devices"},
+{Keywords: []string{"medical label report printer"}, ExcludeKeywords: []string{}, CommonName: "Medical label / report printer", CanonicalName: "Medical label / report printer", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"mri compatible infusion pump"}, ExcludeKeywords: []string{}, CommonName: "MRI-compatible infusion pump", CanonicalName: "MRI-compatible infusion pump", Type: "Treatment, Surgical & Life Support Devices"},
+{Keywords: []string{"mri compatible oxygen canister"}, ExcludeKeywords: []string{}, CommonName: "MRI-compatible oxygen canister", CanonicalName: "MRI-compatible oxygen canister", Type: "Medical Gas & Respiratory Devices"},
+{Keywords: []string{"next generation sequencing system"}, ExcludeKeywords: []string{}, CommonName: "Next generation sequencing system", CanonicalName: "Next generation sequencing system", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"parenteral enteral solution bag"}, ExcludeKeywords: []string{}, CommonName: "Parenteral / enteral solution bag", CanonicalName: "Parenteral / enteral solution bag", Type: "Treatment, Surgical & Life Support Devices"},
+{Keywords: []string{"radiation protection apron rack"}, ExcludeKeywords: []string{}, CommonName: "Radiation protection apron rack", CanonicalName: "Radiation protection apron rack", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"rna dna extraction system"}, ExcludeKeywords: []string{}, CommonName: "RNA/DNA extraction system", CanonicalName: "RNA/DNA extraction system", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"surgical instrument trolley table"}, ExcludeKeywords: []string{}, CommonName: "Surgical instrument trolley / table", CanonicalName: "Surgical instrument trolley / table", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"blood bag scale"}, ExcludeKeywords: []string{}, CommonName: "Blood bag scale", CanonicalName: "Blood bag scale", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"blood collection pipette"}, ExcludeKeywords: []string{}, CommonName: "Blood collection pipette", CanonicalName: "Blood collection pipette", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"capillary blood tube"}, ExcludeKeywords: []string{}, CommonName: "Capillary blood tube", CanonicalName: "Capillary blood tube", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"cell culture tube"}, ExcludeKeywords: []string{}, CommonName: "Cell culture tube", CanonicalName: "Cell culture tube", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"clinical instrument stand"}, ExcludeKeywords: []string{}, CommonName: "Clinical instrument stand", CanonicalName: "Clinical instrument stand", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"cotton applicator sticks"}, ExcludeKeywords: []string{}, CommonName: "Cotton applicator sticks", CanonicalName: "Cotton applicator sticks", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"ct display monitor"}, ExcludeKeywords: []string{}, CommonName: "CT display monitor", CanonicalName: "CT display monitor", Type: "Monitoring & Measurement Devices"},
+{Keywords: []string{"diagnostic examination set"}, ExcludeKeywords: []string{}, CommonName: "Diagnostic examination set", CanonicalName: "Diagnostic examination set", Type: "Diagnostic & Imaging Devices"},
+{Keywords: []string{"dialysis central monitor"}, ExcludeKeywords: []string{}, CommonName: "Dialysis central monitor", CanonicalName: "Dialysis central monitor", Type: "Monitoring & Measurement Devices"},
+{Keywords: []string{"fiducial marker radiotherapy"}, ExcludeKeywords: []string{}, CommonName: "Fiducial marker (radiotherapy)", CanonicalName: "Fiducial marker (radiotherapy)", Type: "Diagnostic & Imaging Devices"},
+{Keywords: []string{"fixed surgical light"}, ExcludeKeywords: []string{}, CommonName: "Fixed surgical light", CanonicalName: "Fixed surgical light", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"histology staining rack"}, ExcludeKeywords: []string{}, CommonName: "Histology staining rack", CanonicalName: "Histology staining rack", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"hot air sterilizer"}, ExcludeKeywords: []string{}, CommonName: "Hot air sterilizer", CanonicalName: "Hot air sterilizer", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"iv infusion pole"}, ExcludeKeywords: []string{}, CommonName: "IV infusion pole", CanonicalName: "IV infusion pole", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"mobile surgical light"}, ExcludeKeywords: []string{}, CommonName: "Mobile surgical light", CanonicalName: "Mobile surgical light", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"mri equipment cart"}, ExcludeKeywords: []string{}, CommonName: "MRI equipment cart", CanonicalName: "MRI equipment cart", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"mri positioning footrest"}, ExcludeKeywords: []string{}, CommonName: "MRI positioning footrest", CanonicalName: "MRI positioning footrest", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"nd yag laser"}, ExcludeKeywords: []string{}, CommonName: "Nd: Yag laser", CanonicalName: "Nd: Yag laser", Type: "Monitoring & Measurement Devices"},
+{Keywords: []string{"ophthalmic examination table"}, ExcludeKeywords: []string{}, CommonName: "Ophthalmic examination table", CanonicalName: "Ophthalmic examination table", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"ophthalmic instrument stand"}, ExcludeKeywords: []string{}, CommonName: "Ophthalmic instrument stand", CanonicalName: "Ophthalmic instrument stand", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"respiratory gas monitor"}, ExcludeKeywords: []string{}, CommonName: "Respiratory gas monitor", CanonicalName: "Respiratory gas monitor", Type: "Monitoring & Measurement Devices"},
+{Keywords: []string{"specimen warming cabinet"}, ExcludeKeywords: []string{}, CommonName: "Specimen warming cabinet", CanonicalName: "Specimen warming cabinet", Type: "Consumables & Accessories"},
+{Keywords: []string{"surgery suction system"}, ExcludeKeywords: []string{}, CommonName: "Surgery suction system", CanonicalName: "Surgery suction system", Type: "Diagnostic & Imaging Devices"},
+{Keywords: []string{"test tube rack"}, ExcludeKeywords: []string{}, CommonName: "Test tube rack", CanonicalName: "Test tube rack", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"treatment examination table"}, ExcludeKeywords: []string{}, CommonName: "Treatment / examination table", CanonicalName: "Treatment / examination table", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"argon laser"}, ExcludeKeywords: []string{}, CommonName: "Argon laser", CanonicalName: "Argon laser", Type: "Monitoring & Measurement Devices"},
+{Keywords: []string{"bedside cabinet"}, ExcludeKeywords: []string{}, CommonName: "Bedside cabinet", CanonicalName: "Bedside cabinet", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"biosafety cabinet"}, ExcludeKeywords: []string{}, CommonName: "Biosafety cabinet", CanonicalName: "Biosafety cabinet", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"cassette printer"}, ExcludeKeywords: []string{}, CommonName: "Cassette printer", CanonicalName: "Cassette printer", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"cell counter"}, ExcludeKeywords: []string{}, CommonName: "Cell counter", CanonicalName: "Cell counter", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"defibrillator trolley"}, ExcludeKeywords: []string{}, CommonName: "Defibrillator trolley", CanonicalName: "Defibrillator trolley", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"dialysis chair"}, ExcludeKeywords: []string{}, CommonName: "Dialysis chair", CanonicalName: "Dialysis chair", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"hybridization incubator"}, ExcludeKeywords: []string{}, CommonName: "Hybridization incubator", CanonicalName: "Hybridization incubator", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"immunochemistry analyzer"}, ExcludeKeywords: []string{}, CommonName: "Immunochemistry analyzer", CanonicalName: "Immunochemistry analyzer", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"instrument cabinet"}, ExcludeKeywords: []string{}, CommonName: "Instrument cabinet", CanonicalName: "Instrument cabinet", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"instruments trolley"}, ExcludeKeywords: []string{}, CommonName: "Instruments trolley", CanonicalName: "Instruments trolley", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"intravenous line"}, ExcludeKeywords: []string{}, CommonName: "Intravenous line", CanonicalName: "Intravenous line", Type: "Consumables & Accessories"},
+{Keywords: []string{"kick bucket"}, ExcludeKeywords: []string{}, CommonName: "Kick bucket", CanonicalName: "Kick bucket", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"medicine cabinet"}, ExcludeKeywords: []string{}, CommonName: "Medicine cabinet", CanonicalName: "Medicine cabinet", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"microscope cabinet"}, ExcludeKeywords: []string{}, CommonName: "Microscope cabinet", CanonicalName: "Microscope cabinet", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"storage cabinet"}, ExcludeKeywords: []string{}, CommonName: "Storage cabinet", CanonicalName: "Storage cabinet", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"surgical light"}, ExcludeKeywords: []string{}, CommonName: "Surgical light", CanonicalName: "Surgical light", Type: "Support Equipment & Furniture"},
+{Keywords: []string{"funnel"}, ExcludeKeywords: []string{}, CommonName: "Funnel", CanonicalName: "Funnel", Type: "Laboratory & IVD Equipment"},
+{Keywords: []string{"spectrophotometer"}, ExcludeKeywords: []string{}, CommonName: "Spectrophotometer", CanonicalName: "Spectrophotometer", Type: "Laboratory & IVD Equipment"},
 {Keywords: []string{"cytoflowmeter", "cytoflowmeters"}, ExcludeKeywords: []string{}, CommonName: "Flow cytometer", CanonicalName: "Flow cytometer", Type: "Laboratory & IVD Equipment", Family: "Flow and cell analysis systems"},
 {Keywords: []string{"blood flow meter", "blood flow meters"}, ExcludeKeywords: []string{}, CommonName: "Blood flow meter", CanonicalName: "Blood flow meter", Type: "Monitoring & Measurement Devices", Family: "Physiological assessment tools"},
 {Keywords: []string{"nasal cannula", "nasal cannulas"}, ExcludeKeywords: []string{}, CommonName: "Oxygen nasal cannula", CanonicalName: "Oxygen nasal cannula", Type: "Medical Gas & Respiratory Devices", Family: "Respiratory masks and interfaces"},
@@ -371,7 +484,7 @@ var FunctionByCode = map[string]string{
 "PATIENT_RELATED_OTHER": "Patient Related and Other",
 }
 
-var OvaholTypeDefaults = map[string]struct{Function, Risk string}{
+var DeviceTypeDefaults = map[string]struct{Function, Risk string}{
 "Monitoring & Measurement Devices": {Function: "Additional Physiological Monitoring and Diagnostic", Risk: "Inappropriate therapy or misdiagnosis"},
 "Diagnostic & Imaging Devices": {Function: "Additional Physiological Monitoring and Diagnostic", Risk: "Inappropriate therapy or misdiagnosis"},
 "Laboratory & IVD Equipment": {Function: "Analytical Laboratory", Risk: "Inappropriate therapy or misdiagnosis"},
@@ -381,3 +494,8 @@ var OvaholTypeDefaults = map[string]struct{Function, Risk string}{
 "Support Equipment & Furniture": {Function: "Patient Related and Other", Risk: "Equipment damage"},
 "Consumables & Accessories": {Function: "Patient Related and Other", Risk: "Equipment damage"},
 }
+// Deprecated: use DeviceTypes
+var OvaholDeviceTypes = DeviceTypes
+
+// Deprecated: use DeviceTypeDefaults
+var OvaholTypeDefaults = DeviceTypeDefaults

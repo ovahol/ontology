@@ -2,7 +2,7 @@
 
 **Ovahol Interchange Ontology** — a Go library that normalizes arbitrary device data from any healthcare system into Ovahol's controlled vocabulary.
 
-Any system hoping to migrate onto Ovahol (or exchange data with it) runs its device records through this library and gets back canonical Ovahol terminology: common name, canonical device name, search aliases, device type, device family, device function, and application risk.
+Any system hoping to migrate onto Ovahol (or exchange data with it) runs its device records through this library and gets back canonical Ovahol terminology: normalized name, device type, device category, device function, and application risk.
 
 This is the interchange schema: one vocabulary, any source.
 
@@ -24,14 +24,12 @@ result := ontology.Normalize(ontology.Input{
     SourceType: "monitoring equipment",
     EMDNTerm:   "Electrocardiographs",
 })
-fmt.Println(result.CommonName)    // ECG machine
-fmt.Println(result.CanonicalName) // Electrocardiography system
-fmt.Println(result.OvaholType)    // Monitoring & Measurement Devices
-fmt.Println(result.Family)        // Cardiac diagnostic systems
-fmt.Println(result.Function)      // Additional Physiological Monitoring and Diagnostic
-fmt.Println(result.Risk)          // Inappropriate therapy or misdiagnosis
-fmt.Println(result.SearchAliases) // ECG machine, EKG machine, Electrocardiograph
-fmt.Println(result.Confidence)    // high
+fmt.Println(result.Name)                  // ECG machine
+fmt.Println(result.DeviceType)            // Monitoring & Measurement Devices
+fmt.Println(result.DeviceCategory)        // Diagnostic
+fmt.Println(result.DeviceFunction)        // Additional Physiological Monitoring and Diagnostic
+fmt.Println(result.DeviceApplicationRisk) // Inappropriate therapy or misdiagnosis
+fmt.Println(result.Confidence)            // high
 ```
 
 Batch:
@@ -66,11 +64,9 @@ The library defines a language-agnostic JSON interchange schema so non-Go system
 
 ```json
 {
-  "common_name": "Infusion pump",
-  "canonical_name": "Infusion or syringe pump system",
-  "search_aliases": "Infusion pump, Infusion or syringe pump system, IV pump",
-  "ovahol_device_type": "Treatment, Surgical & Life Support Devices",
-  "ovahol_device_family": "Infusion and medication delivery systems",
+  "name": "Infusion pump",
+  "device_type": "Treatment, Surgical & Life Support Devices",
+  "device_category": "Therapeutic",
   "device_function": "Surgical and Intensive Care",
   "device_application_risk": "Potential patient or operator injury",
   "legacy_source_name": "Infusion pump, volumetric",
@@ -82,16 +78,20 @@ The library defines a language-agnostic JSON interchange schema so non-Go system
 }
 ```
 
-All `ovahol_*`, `device_function`, and `device_application_risk` values are drawn from a fixed controlled vocabulary — no free-text leakage.
+`device_application` is also present as an alias of `device_function`, kept for callers using the older "device application" wording.
+
+All `device_type`, `device_category`, `device_function`, and `device_application_risk` values are drawn from a fixed controlled vocabulary — no free-text leakage.
 
 ## Controlled vocabulary
 
 | Dimension | Count | Example values |
 |-----------|-------|----------------|
 | Device types | 8 | `Monitoring & Measurement Devices`, `Diagnostic & Imaging Devices`, `Treatment, Surgical & Life Support Devices`, ... |
-| Device families | ~120 | `Cardiac diagnostic systems`, `Ultrasound systems`, `Infusion and medication delivery systems`, ... |
+| Device categories | 4 | `Therapeutic`, `Diagnostic`, `Analytical`, `Miscellaneous` |
 | Device functions | 9 | `Life Support`, `Surgical and Intensive Care`, `Analytical Laboratory`, ... |
 | Application risks | 5 | `Potential patient death`, `Potential patient or operator injury`, `Inappropriate therapy or misdiagnosis`, ... |
+
+Internally the library also carries ~140 family grouping rules (used for name/family inference and in the workbook's audit sheets — see below) and 18 specific-name rules, but `Family` is not part of the public `Result`.
 
 See [`taxonomy.go`](./taxonomy.go) for the full lists and [`doc.go`](./doc.go) for package documentation.
 
@@ -105,6 +105,27 @@ See [`taxonomy.go`](./taxonomy.go) for the full lists and [`doc.go`](./doc.go) f
 | `unsupported_source_type` | Source type not in `SupportedSourceTypes` — no mapping possible |
 
 `Confidence` is `high` / `medium` / `low` / `none`.
+
+## Catalog (exact-match resolution)
+
+If the host system already has a device dictionary (e.g. Ovahol's `core_public.device`), pass it in as a `Catalog` so exact matches skip taxonomy inference entirely and return the dictionary's values verbatim:
+
+```go
+cat := ontology.NewInMemoryCatalog([]ontology.CatalogEntry{
+    {
+        Name:                  "ECG machine",
+        DeviceType:            "Monitoring & Measurement Devices",
+        DeviceCategory:        "Diagnostic",
+        DeviceFunction:        "Additional Physiological Monitoring and Diagnostic",
+        DeviceApplicationRisk: "Inappropriate therapy or misdiagnosis",
+    },
+})
+
+result := ontology.NormalizeWithCatalog(ontology.Input{DeviceName: "ECG machine"}, cat)
+// result.MappingSource == "catalog_exact", result.Confidence == "high"
+```
+
+Matching is by EMDN code, then device name, then EMDN term (all normalized/lowercased). A catalog miss falls back to ordinary taxonomy inference; a `nil` catalog always falls back. Implement `Catalog` yourself (e.g. backed by a single SQL lookup) to avoid vendoring the whole dictionary — see [`catalog.go`](./catalog.go) for the interface and a DB-backed example. `NormalizeBatchWithCatalog` is the batch analogue.
 
 ## Workbook interchange (bulk migration)
 
@@ -125,11 +146,11 @@ The output workbook mirrors the reference template:
 
 | Sheet | Contents |
 |-------|----------|
-| Devices | One row per device: common name, canonical name, aliases, type, family, function, risk, plus legacy source passthrough |
-| API Import | Deduplicated, API-ready rows (`name`, `device_type`, `device_function`, `device_application_risk`, `emdn_code`, `emdn_term`) |
-| Lookups | The 8 types, 9 functions, 5 risks (for Excel data validation) |
-| Naming Rules | How common/canonical/alias names should be formed |
-| Family Rules | All ~120 family grouping rules with match hints |
+| Devices | One row per device: name, type, category, function, risk, plus legacy source passthrough |
+| API Import | Deduplicated, API-ready rows (`name`, `device_type`, `device_category`, `device_function`, `device_application_risk`, `emdn_code`, `emdn_term`) |
+| Lookups | The 8 types, 4 categories, 9 functions, 5 risks (for Excel data validation) |
+| Naming Rules | How names should be formed |
+| Family Rules | All ~140 internal family grouping rules with match hints (used for inference, not exposed on `Result`) |
 | Common Name Mapping Review | Legacy → mapped name audit trail |
 | Family Naming Review | Per-family consistency check |
 | Family Naming Audit | Detailed per-family audit |

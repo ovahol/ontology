@@ -1,7 +1,6 @@
 // Package ontology ports scripts/update_ovahol_ontology.py to Go.
 // Every device_type, device_function, and device_application_risk is validated
-// against lookup.LookupData (the Ovahol source of truth) so the Go pipeline
-// can never drift from what Ovahol requires.
+// against the controlled vocabulary so the pipeline stays consistent.
 package ontology
 
 import (
@@ -88,7 +87,7 @@ func IsSupportedSourceType(sourceType string) bool {
 	return ok
 }
 
-func InferOvaholType(deviceName, sourceType, emdnTerm string) string {
+func InferDeviceType(deviceName, sourceType, emdnTerm string) string {
 	parts := []string{}
 	if deviceName != "" {
 		parts = append(parts, deviceName)
@@ -101,9 +100,6 @@ func InferOvaholType(deviceName, sourceType, emdnTerm string) string {
 	}
 	text := Normalized(strings.Join(parts, " "))
 	source := Normalized(sourceType)
-	if _, ok := SupportedSourceTypes[source]; !ok {
-		return ""
-	}
 	keywordMatch := InferFromKeywords(text)
 	switch source {
 	case "medical equipment":
@@ -173,17 +169,17 @@ func InferOvaholType(deviceName, sourceType, emdnTerm string) string {
 		}
 		return TypeByCode["LABORATORY_IN_VITRO_DIAGNOSTICS"]
 	}
-	if v, ok := DirectSourceTypeMap[source]; ok {
-		return v
-	}
 	if keywordMatch != "" {
 		return keywordMatch
+	}
+	if v, ok := DirectSourceTypeMap[source]; ok {
+		return v
 	}
 	return ""
 }
 
-func InferFamilyRule(deviceName, sourceType, emdnTerm, ovaholType string) *FamilyRule {
-	if ovaholType == "" {
+func InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType string) *FamilyRule {
+	if deviceType == "" {
 		return nil
 	}
 	parts := []string{}
@@ -200,7 +196,7 @@ func InferFamilyRule(deviceName, sourceType, emdnTerm, ovaholType string) *Famil
 	source := Normalized(sourceType)
 	for i := range FamilyRules {
 		r := &FamilyRules[i]
-		if r.Type != ovaholType {
+		if r.Type != deviceType {
 			continue
 		}
 		if source != "" {
@@ -225,12 +221,12 @@ type Defaults struct {
 	CanonicalNameHint string
 }
 
-func InferDefaults(deviceName, sourceType, emdnTerm, ovaholType string) Defaults {
-	if ovaholType == "" {
+func InferDefaults(deviceName, sourceType, emdnTerm, deviceType string) Defaults {
+	if deviceType == "" {
 		return Defaults{}
 	}
-	r := InferFamilyRule(deviceName, sourceType, emdnTerm, ovaholType)
-	td, ok := OvaholTypeDefaults[ovaholType]
+	r := InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType)
+	td, ok := DeviceTypeDefaults[deviceType]
 	if !ok {
 		td = struct{ Function, Risk string }{}
 	}
@@ -238,6 +234,15 @@ func InferDefaults(deviceName, sourceType, emdnTerm, ovaholType string) Defaults
 		return Defaults{Family: r.Family, Function: r.Function, Risk: r.Risk, CommonNameHint: r.CommonName, CanonicalNameHint: r.CanonicalName}
 	}
 	return Defaults{Function: td.Function, Risk: td.Risk}
+}
+
+func CategoryForFunction(name string) string {
+	for _, f := range DeviceFunctions {
+		if f.Name == name {
+			return f.Category
+		}
+	}
+	return ""
 }
 
 func CleanLegacySegment(value string) string {
@@ -770,29 +775,33 @@ func RefineDescriptiveNames(commonName, canonicalName, legacySourceName, emdnTer
 }
 
 type ResolvedRow struct {
-	OvaholType    string
-	Family        string
-	Function      string
-	Risk          string
-	CommonName    string
-	CanonicalName string
-	SearchAliases string
-	NamingSource  string
+	DeviceType            string
+	DeviceCategory        string
+	DeviceFamily          string
+	DeviceFunction        string
+	DeviceApplicationRisk string
+	Name                  string
+	CanonicalName         string
+	CommonNames           []string
+	NamingSource          string
 }
 
 func ResolveRowNaming(row map[string]string) ResolvedRow {
 	legacySourceName := row["Legacy source name"]
 	sourceDeviceType := row["Source device type"]
 	emdnTerm := row["EMDN term"]
-	if !IsSupportedSourceType(sourceDeviceType) {
-		return ResolvedRow{NamingSource: "unsupported_source_type"}
-	}
 	specificRule := InferSpecificNameRule(legacySourceName, sourceDeviceType, emdnTerm)
 	ovaholType := ""
 	if specificRule != nil && specificRule.Type != "" {
 		ovaholType = specificRule.Type
 	} else {
-		ovaholType = InferOvaholType(legacySourceName, sourceDeviceType, emdnTerm)
+		ovaholType = InferDeviceType(legacySourceName, sourceDeviceType, emdnTerm)
+	}
+	if ovaholType == "" {
+		// No signal from the specific-name rules, source-type mapping, or
+		// device name/EMDN term keyword matching — genuinely unclassifiable,
+		// not merely an unrecognized source type string.
+		return ResolvedRow{NamingSource: "unsupported_source_type"}
 	}
 	defaults := InferDefaults(legacySourceName, sourceDeviceType, emdnTerm, ovaholType)
 	generatedCommon := InferCommonNameFromLegacy(legacySourceName)
@@ -823,19 +832,21 @@ func ResolveRowNaming(row map[string]string) ResolvedRow {
 	} else {
 		family = defaults.Family
 	}
+	category := CategoryForFunction(defaults.Function)
 	return ResolvedRow{
-		OvaholType:    ovaholType,
-		Family:        family,
-		Function:      defaults.Function,
-		Risk:          defaults.Risk,
-		CommonName:    commonName,
-		CanonicalName: canonicalName,
-		SearchAliases: BuildSearchAliases(commonName, canonicalName),
-		NamingSource:  namingSource,
+		DeviceType:            ovaholType,
+		DeviceCategory:        category,
+		DeviceFamily:          family,
+		DeviceFunction:        defaults.Function,
+		DeviceApplicationRisk: defaults.Risk,
+		Name:                  commonName,
+		CanonicalName:         canonicalName,
+		CommonNames:           BuildSearchAliases(commonName, canonicalName),
+		NamingSource:          namingSource,
 	}
 }
 
-func BuildSearchAliases(commonName, canonicalName string) string {
+func BuildSearchAliases(commonName, canonicalName string) []string {
 	values := []string{}
 	add := func(v string) {
 		if v == "" {
@@ -1079,11 +1090,13 @@ func BuildSearchAliases(commonName, canonicalName string) string {
 		add("Administrative support equipment")
 		add("Support equipment")
 	}
-	if len(values) <= 1 {
-		if len(values) == 0 {
-			return ""
-		}
-		return values[0]
+	if len(values) == 0 {
+		return nil
 	}
-	return strings.Join(values, ", ")
+	return values
+}
+
+// Deprecated: use InferDeviceType
+func InferOvaholType(deviceName, sourceType, emdnTerm string) string {
+	return InferDeviceType(deviceName, sourceType, emdnTerm)
 }

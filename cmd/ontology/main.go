@@ -28,8 +28,8 @@ func main() {
 }
 
 func validateCompliance() error {
-	if len(ontology.OvaholDeviceTypes) != 8 {
-		return fmt.Errorf("expected 8 Ovahol device types, got %d", len(ontology.OvaholDeviceTypes))
+	if len(ontology.DeviceTypes) != 8 {
+		return fmt.Errorf("expected 8 device types, got %d", len(ontology.DeviceTypes))
 	}
 	if len(ontology.DeviceFunctions) != 9 {
 		return fmt.Errorf("expected 9 device functions, got %d", len(ontology.DeviceFunctions))

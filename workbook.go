@@ -11,7 +11,7 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-// styleHeader applies the Ovahol header style (1F4B99, white bold, centered).
+// styleHeader applies the header style (1F4B99, white bold, centered).
 func styleHeader(f *excelize.File, sheet, cell string) error {
 	style, err := f.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true, Color: "FFFFFF", Size: 10},
@@ -78,17 +78,17 @@ func extractDeviceRows(f *excelize.File, sheetName string) ([]map[string]string,
 			}
 			return ""
 		}
-		// Also allow "Device name" / "name" etc.
+		// Also allow "Device name" / "name" etc. — support both new agnostic and legacy Ovahol headers for backward compat
 		m := map[string]string{
-			"Common name":           get("Common name", "common_name"),
+			"Name":                  get("Name", "Common name", "common_name"),
 			"Canonical device name": get("Canonical device name", "canonical_device_name"),
-			"Search aliases":        get("Search aliases", "search_aliases"),
-			"Ovahol device type":    get("Ovahol device type", "device_type"),
-			"Ovahol device family":  get("Ovahol device family", "device_family"),
+			"Common names":          get("Common names", "Search aliases", "search_aliases", "common_names"),
+			"Device type":           get("Device type", "device_type", "Ovahol device type", "ovahol_device_type"),
+			"Device family":         get("Device family", "device_family", "Ovahol device family", "ovahol_device_family"),
 			"Device function":       get("Device function", "device_function"),
 			"Device application risk": get("Device application risk", "device_application_risk"),
-			"Legacy source name":    get("Legacy source name", "Device name", "name"),
-			"Source device type":    get("Source device type", "Device type"),
+			"Legacy source name":    get("Legacy source name", "Device name", "name", "legacy_source_name"),
+			"Source device type":    get("Source device type", "source_type"),
 			"EMDN code":             get("EMDN code", "emdn_code", emdnCodeKey),
 			"EMDN term":             get("EMDN term", "emdn_term", emdnTermKey),
 		}
@@ -140,13 +140,11 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 	for rowIdx, row := range rows {
 		resolved := ResolveRowNaming(row)
 		values := []string{
-			resolved.CommonName,
-			resolved.CanonicalName,
-			resolved.SearchAliases,
-			resolved.OvaholType,
-			resolved.Family,
-			resolved.Function,
-			resolved.Risk,
+			resolved.Name,
+			resolved.DeviceType,
+			resolved.DeviceCategory,
+			resolved.DeviceFunction,
+			resolved.DeviceApplicationRisk,
 			row["Legacy source name"],
 			row["Source device type"],
 			row["EMDN code"],
@@ -160,9 +158,9 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 	f.SetPanes(sheetName, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
 	maxRow := len(rows) + 1
 	if maxRow >= 2 {
-		f.AutoFilter(sheetName, fmt.Sprintf("A1:K%d", maxRow), nil)
+		f.AutoFilter(sheetName, fmt.Sprintf("A1:I%d", maxRow), nil)
 	}
-	widths := map[string]float64{"A": 28, "B": 36, "C": 40, "D": 34, "E": 30, "F": 34, "G": 34, "H": 48, "I": 34, "J": 18, "K": 44}
+	widths := map[string]float64{"A": 28, "B": 34, "C": 24, "D": 34, "E": 34, "F": 48, "G": 34, "H": 18, "I": 44}
 	for col, w := range widths {
 		f.SetColWidth(sheetName, col, col, w)
 	}
@@ -208,16 +206,25 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string) error {
 			}
 			return ""
 		}
-		values := []string{
-			get("Common name"),
-			get("Ovahol device type"),
-			get("Device function"),
-			get("Device application risk"),
-			get("EMDN code"),
-			get("EMDN term"),
+		getWithFallback := func(keys ...string) string {
+			for _, k := range keys {
+				if v := get(k); v != "" {
+					return v
+				}
+			}
+			return ""
 		}
-		// skip if any of first 4 empty (Ovahol requires these)
-		if values[0] == "" || values[1] == "" || values[2] == "" || values[3] == "" {
+		values := []string{
+			getWithFallback("Name", "Common name"),
+			getWithFallback("Device type", "Ovahol device type"),
+			getWithFallback("Device category"),
+			getWithFallback("Device function"),
+			getWithFallback("Device application risk"),
+			getWithFallback("EMDN code"),
+			getWithFallback("EMDN term"),
+		}
+		// skip if any of first 5 empty (requires name + 4 taxonomy fields)
+		if values[0] == "" || values[1] == "" || values[2] == "" || values[3] == "" || values[4] == "" {
 			continue
 		}
 		key := strings.Join(values, "\x00")
@@ -232,9 +239,9 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string) error {
 	}
 	f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
 	if outRow > 2 {
-		f.AutoFilter(sheet, fmt.Sprintf("A1:F%d", outRow-1), nil)
+		f.AutoFilter(sheet, fmt.Sprintf("A1:G%d", outRow-1), nil)
 	}
-	widths := map[string]float64{"A": 34, "B": 34, "C": 34, "D": 34, "E": 18, "F": 42}
+	widths := map[string]float64{"A": 34, "B": 24, "C": 34, "D": 34, "E": 18, "F": 42, "G": 42}
 	for col, w := range widths {
 		f.SetColWidth(sheet, col, col, w)
 	}
@@ -253,32 +260,41 @@ func rebuildLookupsSheet(f *excelize.File) error {
 	}
 	_ = newIdx
 	headers := []struct{ Cell, Value string }{
-		{"A1", "Ovahol device types"},
-		{"D1", "Device functions"},
-		{"G1", "Device application risks"},
+		{"A1", "Device types"},
+		{"C1", "Device categories"},
+		{"E1", "Device functions"},
+		{"H1", "Device application risks"},
 	}
 	for _, h := range headers {
 		f.SetCellValue(sheet, h.Cell, h.Value)
 		styleHeader(f, sheet, h.Cell)
 	}
-	for i, dt := range OvaholDeviceTypes {
+	for i, dt := range DeviceTypes {
 		f.SetCellValue(sheet, fmt.Sprintf("A%d", i+2), dt.Name)
 		f.SetCellValue(sheet, fmt.Sprintf("B%d", i+2), dt.Code)
 	}
+	for i, dc := range DeviceCategories {
+		f.SetCellValue(sheet, fmt.Sprintf("C%d", i+2), dc.Name)
+		f.SetCellValue(sheet, fmt.Sprintf("D%d", i+2), dc.Code)
+	}
 	for i, fn := range DeviceFunctions {
-		f.SetCellValue(sheet, fmt.Sprintf("D%d", i+2), fn.Name)
-		f.SetCellValue(sheet, fmt.Sprintf("E%d", i+2), fn.Code)
+		f.SetCellValue(sheet, fmt.Sprintf("E%d", i+2), fn.Name)
+		f.SetCellValue(sheet, fmt.Sprintf("F%d", i+2), fn.Code)
+		f.SetCellValue(sheet, fmt.Sprintf("G%d", i+2), fn.Category)
 	}
 	for i, r := range DeviceApplicationRisks {
-		f.SetCellValue(sheet, fmt.Sprintf("G%d", i+2), r.Description)
-		f.SetCellValue(sheet, fmt.Sprintf("H%d", i+2), r.ScorePoint)
+		f.SetCellValue(sheet, fmt.Sprintf("H%d", i+2), r.Description)
+		f.SetCellValue(sheet, fmt.Sprintf("I%d", i+2), r.ScorePoint)
 	}
 	f.SetColWidth(sheet, "A", "A", 44)
 	f.SetColWidth(sheet, "B", "B", 40)
-	f.SetColWidth(sheet, "D", "D", 44)
-	f.SetColWidth(sheet, "E", "E", 32)
-	f.SetColWidth(sheet, "G", "G", 42)
-	f.SetColWidth(sheet, "H", "H", 12)
+	f.SetColWidth(sheet, "C", "C", 24)
+	f.SetColWidth(sheet, "D", "D", 24)
+	f.SetColWidth(sheet, "E", "E", 44)
+	f.SetColWidth(sheet, "F", "F", 32)
+	f.SetColWidth(sheet, "G", "G", 24)
+	f.SetColWidth(sheet, "H", "H", 42)
+	f.SetColWidth(sheet, "I", "I", 12)
 	return nil
 }
 
@@ -327,7 +343,7 @@ func rebuildFamilyRulesSheet(f *excelize.File) error {
 		return err
 	}
 	_ = newIdx
-	headers := []string{"Ovahol device type", "Ovahol device family", "Suggested common name", "Suggested canonical name", "Default device function", "Default application risk", "Match hints"}
+	headers := []string{"Device type", "Device family", "Suggested name", "Suggested canonical name", "Default device function", "Default application risk", "Match hints"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
@@ -370,7 +386,7 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string) 
 		return err
 	}
 	_ = newIdx
-	headers := []string{"Legacy source name", "Mapped common name", "Canonical device name", "Ovahol device type", "Ovahol device family", "Device function", "Device application risk", "EMDN code", "EMDN term", "Mapping source"}
+	headers := []string{"Legacy source name", "Name", "Device type", "Device category", "Device function", "Device application risk", "EMDN code", "EMDN term", "Mapping source"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
@@ -404,10 +420,9 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string) 
 		resolved := ResolveRowNaming(rmap)
 		values := []string{
 			get("Legacy source name"),
-			get("Common name"),
-			get("Canonical device name"),
-			get("Ovahol device type"),
-			get("Ovahol device family"),
+			get("Name"),
+			get("Device type"),
+			get("Device category"),
 			get("Device function"),
 			get("Device application risk"),
 			get("EMDN code"),
@@ -420,8 +435,8 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string) 
 		outRow++
 	}
 	f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	f.AutoFilter(sheet, fmt.Sprintf("A1:J%d", outRow-1), nil)
-	widths := map[string]float64{"A": 52, "B": 28, "C": 38, "D": 34, "E": 34, "F": 34, "G": 34, "H": 18, "I": 44, "J": 18}
+	f.AutoFilter(sheet, fmt.Sprintf("A1:I%d", outRow-1), nil)
+	widths := map[string]float64{"A": 52, "B": 28, "C": 34, "D": 24, "E": 34, "F": 34, "G": 18, "H": 44, "I": 18}
 	for col, w := range widths {
 		f.SetColWidth(sheet, col, col, w)
 	}
@@ -439,7 +454,7 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 		return err
 	}
 	_ = newIdx
-	headers := []string{"Ovahol device type", "Ovahol device family", "Device count", "Consistency status", "Common name standard", "Canonical name standard", "Search aliases standard", "Distinct common names", "Distinct canonical names", "Distinct alias strings", "Source device types seen", "Sample legacy source names"}
+	headers := []string{"Device type", "Device family", "Device count", "Consistency status", "Common name standard", "Canonical name standard", "Common names standard", "Distinct common names", "Distinct canonical names", "Distinct alias strings", "Source device types seen", "Sample legacy source names"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
@@ -474,8 +489,8 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 			}
 			return ""
 		}
-		dt := get("Ovahol device type")
-		fam := get("Ovahol device family")
+		dt := get("Device type")
+		fam := get("Device family")
 		if dt == "" || fam == "" {
 			continue
 		}
@@ -485,13 +500,13 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 		}
 		a := grouped[k]
 		a.count++
-		if v := get("Common name"); v != "" {
+		if v := get("Name"); v != "" {
 			a.common[v] = true
 		}
 		if v := get("Canonical device name"); v != "" {
 			a.canonical[v] = true
 		}
-		if v := get("Search aliases"); v != "" {
+		if v := get("Common names"); v != "" {
 			a.aliases[v] = true
 		}
 		if v := get("Source device type"); v != "" {
@@ -595,8 +610,8 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 			}
 			return ""
 		}
-		dt := get("Ovahol device type")
-		fam := get("Ovahol device family")
+		dt := get("Device type")
+		fam := get("Device family")
 		if dt == "" || fam == "" {
 			continue
 		}
@@ -605,13 +620,13 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 			grouped[k] = &agg{common: map[string]bool{}, canonical: map[string]bool{}, aliases: map[string]bool{}}
 		}
 		a := grouped[k]
-		if v := get("Common name"); v != "" {
+		if v := get("Name"); v != "" {
 			a.common[v] = true
 		}
 		if v := get("Canonical device name"); v != "" {
 			a.canonical[v] = true
 		}
-		if v := get("Search aliases"); v != "" {
+		if v := get("Common names"); v != "" {
 			a.aliases[v] = true
 		}
 	}
@@ -654,17 +669,17 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 }
 
 func applyValidations(f *excelize.File, sheet string, maxRow int) error {
-	typeEnd := 1 + len(OvaholDeviceTypes)
-	familyEnd := 1 + len(FamilyRules)
+	typeEnd := 1 + len(DeviceTypes)
+	categoryEnd := 1 + len(DeviceCategories)
 	funcEnd := 1 + len(DeviceFunctions)
 	riskEnd := 1 + len(DeviceApplicationRisks)
 	validations := []struct {
 		SqRef, Formula string
 	}{
-		{fmt.Sprintf("D2:D%d", maxRow), fmt.Sprintf("Lookups!$A$2:$A$%d", typeEnd)},
-		{fmt.Sprintf("E2:E%d", maxRow), fmt.Sprintf("'Family Rules'!$B$2:$B$%d", familyEnd)},
-		{fmt.Sprintf("F2:F%d", maxRow), fmt.Sprintf("Lookups!$D$2:$D$%d", funcEnd)},
-		{fmt.Sprintf("G2:G%d", maxRow), fmt.Sprintf("Lookups!$G$2:$G$%d", riskEnd)},
+		{fmt.Sprintf("B2:B%d", maxRow), fmt.Sprintf("Lookups!$A$2:$A$%d", typeEnd)},
+		{fmt.Sprintf("C2:C%d", maxRow), fmt.Sprintf("Lookups!$C$2:$C$%d", categoryEnd)},
+		{fmt.Sprintf("D2:D%d", maxRow), fmt.Sprintf("Lookups!$E$2:$E$%d", funcEnd)},
+		{fmt.Sprintf("E2:E%d", maxRow), fmt.Sprintf("Lookups!$H$2:$H$%d", riskEnd)},
 	}
 	for _, v := range validations {
 		dv := excelize.NewDataValidation(true)
@@ -704,8 +719,8 @@ func writeAPIImportCSV(f *excelize.File, devicesSheet, outputPath string) (strin
 			return ""
 		}
 		values := []string{
-			get("Common name"),
-			get("Ovahol device type"),
+			get("Name"),
+			get("Device type"),
 			get("Device function"),
 			get("Device application risk"),
 			get("EMDN code"),
@@ -744,7 +759,7 @@ func limit(s []string, n int) []string {
 // UpdateOntology is the main entrypoint, mirroring Python's main().
 // NormalizeWorkbook is the workbook interchange entry point for bulk migration.
 // It reads any spreadsheet with at least a device name column, normalizes
-// every row through the ontology, and writes a fully populated Ovahol
+// every row through the ontology, and writes a fully populated
 // workbook plus a deduplicated API-import CSV.
 //
 // UpdateOntology is kept as an alias for backward compatibility with the
@@ -869,7 +884,7 @@ func NormalizeCSV(path string) ([]Result, error) {
 			return ""
 		}
 		in := Input{
-			DeviceName: get("Legacy source name", "Device name", "name", "Common name", "common_name"),
+			DeviceName: get("Legacy source name", "Device name", "name", "Name", "common_name"),
 			SourceType: get("Source device type", "Device type", "source_type"),
 			EMDNCode:   get("EMDN code", "emdn_code", emdnCodeKey),
 			EMDNTerm:   get("EMDN term", "emdn_term", emdnTermKey),

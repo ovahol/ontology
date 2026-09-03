@@ -10,7 +10,7 @@ import (
 )
 
 // Normalize is the primary interchange entry point. It takes one raw device
-// record from any external system and returns the canonical Ovahol-standard
+// record from any external system and returns the canonical system-agnostic
 // record. This is the function any migrator calls per row.
 //
 // Example:
@@ -21,8 +21,8 @@ import (
 //	    EMDNTerm:   "Peripheral venous catheters",
 //	})
 //	// result.IsValid() == true
-//	// result.CommonName == "Peripheral intravenous catheter" (or similar)
-//	// result.OvaholType == "Consumables & Accessories"
+//	// result.Name == "Peripheral intravenous catheter" (or similar)
+//	// result.DeviceType == "Consumables & Accessories"
 func Normalize(in Input) Result {
 	row := map[string]string{
 		"Legacy source name": in.DeviceName,
@@ -36,19 +36,18 @@ func Normalize(in Input) Result {
 	confidence := confidenceFor(resolved)
 
 	return Result{
-		CommonName:       resolved.CommonName,
-		CanonicalName:    resolved.CanonicalName,
-		SearchAliases:    resolved.SearchAliases,
-		OvaholType:       resolved.OvaholType,
-		Family:           resolved.Family,
-		Function:         resolved.Function,
-		Risk:             resolved.Risk,
-		LegacySourceName: in.DeviceName,
-		SourceType:       in.SourceType,
-		EMDNCode:         in.EMDNCode,
-		EMDNTerm:         in.EMDNTerm,
-		MappingSource:    resolved.NamingSource,
-		Confidence:       confidence,
+		Name:                  resolved.Name,
+		DeviceType:            resolved.DeviceType,
+		DeviceCategory:        resolved.DeviceCategory,
+		DeviceFunction:        resolved.DeviceFunction,
+		DeviceApplication:     resolved.DeviceFunction,
+		DeviceApplicationRisk: resolved.DeviceApplicationRisk,
+		LegacySourceName:      in.DeviceName,
+		SourceType:            in.SourceType,
+		EMDNCode:              in.EMDNCode,
+		EMDNTerm:              in.EMDNTerm,
+		MappingSource:         resolved.NamingSource,
+		Confidence:            confidence,
 	}
 }
 
@@ -59,12 +58,12 @@ func confidenceFor(r ResolvedRow) string {
 	case "specific_rule":
 		return "high"
 	case "legacy_derived":
-		if r.Family != "" {
+		if r.DeviceCategory != "" {
 			return "high"
 		}
 		return "medium"
 	case "family_fallback":
-		if r.Family != "" {
+		if r.DeviceCategory != "" {
 			return "medium"
 		}
 		return "low"
@@ -126,8 +125,7 @@ func ToCSV(results []Result) ([]byte, error) {
 	var buf strings.Builder
 	w := csv.NewWriter(&buf)
 	headers := []string{
-		"Common name", "Canonical device name", "Search aliases",
-		"Ovahol device type", "Ovahol device family", "Device function",
+		"Name", "Device type", "Device category", "Device function",
 		"Device application risk", "Legacy source name", "Source device type",
 		"EMDN code", "EMDN term", "Mapping source", "Confidence",
 	}
@@ -136,8 +134,7 @@ func ToCSV(results []Result) ([]byte, error) {
 	}
 	for _, r := range results {
 		row := []string{
-			r.CommonName, r.CanonicalName, r.SearchAliases,
-			r.OvaholType, r.Family, r.Function, r.Risk,
+			r.Name, r.DeviceType, r.DeviceCategory, r.DeviceFunction, r.DeviceApplicationRisk,
 			r.LegacySourceName, r.SourceType, r.EMDNCode, r.EMDNTerm,
 			r.MappingSource, r.Confidence,
 		}
@@ -154,7 +151,7 @@ func ToCSV(results []Result) ([]byte, error) {
 
 // ToAPIImportRecords deduplicates Results into API-ready import records.
 // Only valid results (IsValid() == true) are included. Deduplication is by
-// (CommonName, OvaholType, Function, Risk, EMDNCode, EMDNTerm).
+// (Name, DeviceType, DeviceCategory, DeviceFunction, DeviceApplicationRisk).
 func ToAPIImportRecords(results []Result) []APIImportRecord {
 	seen := make(map[string]struct{})
 	var out []APIImportRecord
@@ -164,8 +161,8 @@ func ToAPIImportRecords(results []Result) []APIImportRecord {
 		}
 		rec := r.ToAPIImportRecord()
 		key := strings.Join([]string{
-			rec.Name, rec.DeviceType, rec.DeviceFunction,
-			rec.DeviceApplicationRisk, rec.EMDNCode, rec.EMDNTerm,
+			rec.Name, rec.DeviceType, rec.DeviceCategory, rec.DeviceFunction,
+			rec.DeviceApplicationRisk,
 		}, "\x00")
 		if _, ok := seen[key]; ok {
 			continue
