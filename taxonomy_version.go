@@ -14,21 +14,42 @@ import (
 // used for semver compatibility checks when a taxonomy is loaded.
 const CurrentSchemaVersion = "1.0.0"
 
-// CurrentTaxonomyID is kept for migration helpers but no longer embedded.
-const CurrentTaxonomyID = "ovahol-ontology"
-
-// CurrentTaxonomyVersion is an alias for CurrentSchemaVersion.
-const CurrentTaxonomyVersion = CurrentSchemaVersion
-
-// TaxonomyVersion is kept for backward-compat.
-const TaxonomyVersion = CurrentSchemaVersion
-
-// FieldDef defines a custom taxonomy classification field / dimension.
+// FieldDef declares one vendor-defined classification dimension. A taxonomy
+// is nothing more than a list of these — there is no dimension ontology
+// treats as special. Vendors with 2 dimensions declare 2; vendors with 8
+// declare 8. The 4 constants in schema.go (FieldDeviceType and friends) are
+// just conventional keys the built-in defaults and Ovahol's own taxonomy
+// happen to use — nothing in the engine requires them.
 type FieldDef struct {
 	Key           string   `json:"key"`
 	Label         string   `json:"label,omitempty"`
 	Required      bool     `json:"required,omitempty"`
 	AllowedValues []string `json:"allowed_values,omitempty"`
+}
+
+// Rule is one inference rule: if the input matches When, assign Set's
+// key/value pairs to the result's fields (first rule to set a given field
+// wins — later rules only fill in fields still unset).
+//
+// Requires gates the rule on fields *already resolved by earlier rules* in
+// the same taxonomy's rule list, so vendors express multi-stage inference
+// (e.g. "resolve device_type, then derive device_function/risk from it,
+// then derive device_category from device_function") purely as ordering:
+// list dimension-resolving rules before the rules that depend on them.
+//
+// A rule matches when: Requires is satisfied (AND, if present) AND at least
+// one of Keywords/SourceTypes matches (OR between the two), OR — if neither
+// Keywords nor SourceTypes is set — Requires alone is enough (a pure
+// "defaults" rule).
+type Rule struct {
+	ID              string            `json:"id,omitempty"`
+	Keywords        []string          `json:"keywords,omitempty"`
+	ExcludeKeywords []string          `json:"exclude_keywords,omitempty"`
+	SourceTypes     []string          `json:"source_types,omitempty"`
+	Requires        map[string]string `json:"requires,omitempty"`
+	Set             map[string]string `json:"set,omitempty"`
+	Name            string            `json:"name,omitempty"`
+	CanonicalName   string            `json:"canonical_name,omitempty"`
 }
 
 // NameRefinementRule defines a keyword-based common/canonical name transformation rule.
@@ -45,22 +66,14 @@ type SearchAliasRule struct {
 	Aliases  []string `json:"aliases"`
 }
 
-// InferenceRules contains all rule-based matching, grouping, and inference configuration.
+// InferenceRules contains a vendor's ordered rule list plus generic
+// text-processing configuration (word lists, not dimension-specific) used
+// for name cleanup/humanization and search alias generation.
 type InferenceRules struct {
-	TypeByKeyword []struct {
-		Keywords []string `json:"keywords"`
-		Type     string   `json:"type"`
-	} `json:"typeByKeyword,omitempty"`
-	SourceTypeMap        map[string]string   `json:"sourceTypeMap,omitempty"`
-	SupportedSourceTypes map[string]struct{} `json:"supportedSourceTypes,omitempty"`
-	FamilyRules          []FamilyRule        `json:"familyRules,omitempty"`
-	SpecificNameRules    []SpecificNameRule  `json:"specificNameRules,omitempty"`
-	TypeDefaults         map[string]struct {
-		Function string `json:"function"`
-		Risk     string `json:"risk"`
-	} `json:"typeDefaults,omitempty"`
-	TypeByCode              map[string]string    `json:"typeByCode,omitempty"`
-	FunctionByCode          map[string]string    `json:"functionByCode,omitempty"`
+	Rules []Rule `json:"rules,omitempty"`
+
+	// Text-processing config. None of these presuppose any particular
+	// classification dimension — they operate on the free-text device name.
 	GenericLegacyHeads      []string             `json:"genericLegacyHeads,omitempty"`
 	LegacyDescriptorPhrases []string             `json:"legacyDescriptorPhrases,omitempty"`
 	NameRefinementRules     []NameRefinementRule `json:"nameRefinementRules,omitempty"`
@@ -69,33 +82,48 @@ type InferenceRules struct {
 	SearchAliasRules        []SearchAliasRule    `json:"searchAliasRules,omitempty"`
 }
 
-// Taxonomy is the complete specification of a vendor's controlled vocabulary,
-// classification dimensions, and inference rules.
+// Taxonomy is the complete specification of a vendor's controlled
+// vocabulary (Fields) and inference logic (Inference.Rules). It is pure
+// data — vendors author it as JSON in their own codebase/repo and load it
+// via LoadTaxonomyFile. ontology ships no vocabulary of its own beyond the
+// neutral WHO/MeDevIS reference returned by DefaultTaxonomy.
 type Taxonomy struct {
-	ID                     string                  `json:"id"`
-	Name                   string                  `json:"name,omitempty"`
-	Version                string                  `json:"version,omitempty"`
-	SchemaVersion          string                  `json:"schemaVersion,omitempty"`
-	DeviceTypes            []DeviceType            `json:"deviceTypes,omitempty"`
-	DeviceCategories       []DeviceCategory        `json:"deviceCategories,omitempty"`
-	DeviceFunctions        []DeviceFunction        `json:"deviceFunctions,omitempty"`
-	DeviceApplicationRisks []DeviceApplicationRisk `json:"deviceApplicationRisks,omitempty"`
-	NamingRules            []NamingRule            `json:"namingRules,omitempty"`
-	Fields                 []FieldDef              `json:"fields,omitempty"`
-	Inference              *InferenceRules         `json:"inference,omitempty"`
-	Source                 string                  `json:"source,omitempty"`
-	Counts                 map[string]int          `json:"counts,omitempty"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name,omitempty"`
+	Version       string     `json:"version,omitempty"`
+	SchemaVersion string     `json:"schemaVersion,omitempty"`
+	Fields        []FieldDef `json:"fields"`
+
+	NamingRules []NamingRule    `json:"namingRules,omitempty"`
+	Inference   *InferenceRules `json:"inference,omitempty"`
+	Source      string          `json:"source,omitempty"`
 }
 
-// CurrentTaxonomy is deprecated: ontology no longer ships a hardcoded runtime vocab.
-// Vendors provide their own Taxonomy via LoadTaxonomy / LoadTaxonomyFile.
-// Kept as stub to ease migration — returns empty taxonomy with current ID/version.
-func CurrentTaxonomy() *Taxonomy {
-	return &Taxonomy{
-		ID:            CurrentTaxonomyID,
-		Version:       CurrentSchemaVersion,
-		SchemaVersion: CurrentSchemaVersion,
+// Field returns the FieldDef for key, or nil if the taxonomy doesn't declare it.
+func (t *Taxonomy) Field(key string) *FieldDef {
+	if t == nil {
+		return nil
 	}
+	for i := range t.Fields {
+		if t.Fields[i].Key == key {
+			return &t.Fields[i]
+		}
+	}
+	return nil
+}
+
+// RequiredFieldKeys returns the keys of all fields marked Required.
+func (t *Taxonomy) RequiredFieldKeys() []string {
+	if t == nil {
+		return nil
+	}
+	var keys []string
+	for _, f := range t.Fields {
+		if f.Required {
+			keys = append(keys, f.Key)
+		}
+	}
+	return keys
 }
 
 // parseSemver parses a strict semver "MAJOR.MINOR.PATCH" (no leading "v").
@@ -127,37 +155,6 @@ func parseSemver(v string) (major, minor, patch int, err error) {
 	return major, minor, patch, nil
 }
 
-// compareSemver returns -1 if a<b, 0 if a==b, 1 if a>b.
-func compareSemver(a, b string) (int, error) {
-	ma, mi, pa, err := parseSemver(a)
-	if err != nil {
-		return 0, err
-	}
-	mb, mib, pb, err := parseSemver(b)
-	if err != nil {
-		return 0, err
-	}
-	if ma != mb {
-		if ma < mb {
-			return -1, nil
-		}
-		return 1, nil
-	}
-	if mi != mib {
-		if mi < mib {
-			return -1, nil
-		}
-		return 1, nil
-	}
-	if pa != pb {
-		if pa < pb {
-			return -1, nil
-		}
-		return 1, nil
-	}
-	return 0, nil
-}
-
 // isBreakingMismatch reports whether loaded vs current is a breaking change
 // (different major version).
 func isBreakingMismatch(loaded, current string) (bool, error) {
@@ -172,7 +169,9 @@ func isBreakingMismatch(loaded, current string) (bool, error) {
 	return ma != mb, nil
 }
 
-// Validate checks id, version, and taxonomy payload for well-formedness.
+// Validate checks a taxonomy for well-formedness: valid id/version, at
+// least one field, and every required field carrying its controlled
+// vocabulary (allowed_values).
 func (t *Taxonomy) Validate() error {
 	if strings.TrimSpace(t.ID) == "" {
 		return fmt.Errorf("taxonomy: missing id")
@@ -184,27 +183,28 @@ func (t *Taxonomy) Validate() error {
 	if _, _, _, err := parseSemver(ver); err != nil {
 		return fmt.Errorf("taxonomy: %w", err)
 	}
-	if len(t.Fields) > 0 {
-		hasRequired := false
-		for _, f := range t.Fields {
-			if strings.TrimSpace(f.Key) == "" {
-				return fmt.Errorf("taxonomy: field missing key")
-			}
-			if f.Required {
-				hasRequired = true
-				if len(f.AllowedValues) == 0 {
-					return fmt.Errorf("taxonomy: required field %q missing allowed_values", f.Key)
-				}
-			}
-		}
-		if !hasRequired && len(t.Fields) > 0 {
-			return fmt.Errorf("taxonomy: at least one field must be required")
-		}
-		return nil
+	if len(t.Fields) == 0 {
+		return fmt.Errorf("taxonomy: at least one field must be defined")
 	}
-	// Ovahol-shaped or minimal taxonomy
-	if len(t.DeviceTypes) == 0 && len(t.DeviceCategories) == 0 && len(t.DeviceFunctions) == 0 && len(t.DeviceApplicationRisks) == 0 && t.Inference == nil {
-		return fmt.Errorf("taxonomy: at least one field, device type, category, or inference rule must be defined")
+	hasRequired := false
+	seen := make(map[string]bool, len(t.Fields))
+	for _, f := range t.Fields {
+		if strings.TrimSpace(f.Key) == "" {
+			return fmt.Errorf("taxonomy: field missing key")
+		}
+		if seen[f.Key] {
+			return fmt.Errorf("taxonomy: duplicate field key %q", f.Key)
+		}
+		seen[f.Key] = true
+		if f.Required {
+			hasRequired = true
+			if len(f.AllowedValues) == 0 {
+				return fmt.Errorf("taxonomy: required field %q missing allowed_values", f.Key)
+			}
+		}
+	}
+	if !hasRequired {
+		return fmt.Errorf("taxonomy: at least one field must be required")
 	}
 	return nil
 }
@@ -253,16 +253,6 @@ func Migrate(t *Taxonomy) (*Taxonomy, error) {
 	if breaking {
 		return nil, fmt.Errorf("taxonomy: breaking version mismatch: got %q, want %q (major version differs)", ver, CurrentSchemaVersion)
 	}
-	cmp, err := compareSemver(ver, CurrentSchemaVersion)
-	if err != nil {
-		return nil, err
-	}
-	if cmp == 0 {
-		t.Version = CurrentSchemaVersion
-		t.SchemaVersion = CurrentSchemaVersion
-		return t, nil
-	}
-	// Minor/patch migration: accept older or newer patch within same major.
 	t.Version = CurrentSchemaVersion
 	t.SchemaVersion = CurrentSchemaVersion
 	return t, nil
@@ -311,15 +301,4 @@ func LoadTaxonomyFile(path string) (*Taxonomy, error) {
 		return nil, fmt.Errorf("taxonomy: read %s: %w", path, err)
 	}
 	return LoadTaxonomy(data)
-}
-
-// LoadEmbeddedTaxonomy is deprecated: no embedded vocab any more.
-// Vendors must load from their own file via LoadTaxonomyFile.
-func LoadEmbeddedTaxonomy() (*Taxonomy, error) {
-	return nil, fmt.Errorf("taxonomy: no embedded taxonomy — provide your own taxonomy file via LoadTaxonomyFile")
-}
-
-// MustLoadEmbeddedTaxonomy is deprecated: see LoadEmbeddedTaxonomy.
-func MustLoadEmbeddedTaxonomy() *Taxonomy {
-	panic("taxonomy: no embedded taxonomy — provide your own taxonomy file")
 }

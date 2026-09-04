@@ -195,13 +195,13 @@ func (r InterchangeRecord) GetField(key string) string {
 // APIImportRecord is the deduplicated API-ready shape for Ovahol.
 // Fields enables pluggable taxonomy dimensions; fixed fields remain as deprecated shims.
 type APIImportRecord struct {
-	Name                  string `json:"name"`
-	DeviceType            string `json:"device_type"`
-	DeviceCategory        string `json:"device_category"`
-	DeviceFunction        string `json:"device_function"`
-	DeviceApplicationRisk string `json:"device_application_risk"`
-	EMDNCode              string `json:"emdn_code,omitempty"`
-	EMDNTerm              string `json:"emdn_term,omitempty"`
+	Name                  string            `json:"name"`
+	DeviceType            string            `json:"device_type"`
+	DeviceCategory        string            `json:"device_category"`
+	DeviceFunction        string            `json:"device_function"`
+	DeviceApplicationRisk string            `json:"device_application_risk"`
+	EMDNCode              string            `json:"emdn_code,omitempty"`
+	EMDNTerm              string            `json:"emdn_term,omitempty"`
 	Fields                map[string]string `json:"fields,omitempty"`
 }
 
@@ -340,9 +340,11 @@ func (r Result) ToInterchangeRecord() InterchangeRecord {
 	}
 }
 
+// IsValid reports whether normalization actually resolved fields for this
+// input. It doesn't check any specific dimension by name — a vendor whose
+// taxonomy declares entirely different fields still gets a correct answer.
 func (r Result) IsValid() bool {
-	dt := r.GetField(FieldDeviceType)
-	return dt != "" && r.MappingSource != "unsupported_source_type"
+	return len(r.Fields) > 0 && r.MappingSource != "unsupported_source_type"
 }
 
 // SearchAliasesString is kept for compat (now no-op).

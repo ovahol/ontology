@@ -2,244 +2,6 @@
   "id": "medevis",
   "version": "2025.2.1",
   "schemaVersion": "1.0.0",
-  "deviceTypes": [
-    {
-      "name": "Accessories",
-      "code": "ACCESSORIES"
-    },
-    {
-      "name": "Assistive products",
-      "code": "ASSISTIVE_PRODUCTS"
-    },
-    {
-      "name": "Catheters and related",
-      "code": "CATHETERS_AND_RELATED"
-    },
-    {
-      "name": "Cleaning / disinfection / sterilization equipment",
-      "code": "CLEANING___DISINFECTION___STERILIZATION_EQUIPMENT"
-    },
-    {
-      "name": "Cleaning / disinfection / sterilization solutions",
-      "code": "CLEANING___DISINFECTION___STERILIZATION_SOLUTIONS"
-    },
-    {
-      "name": "Collection devices",
-      "code": "COLLECTION_DEVICES"
-    },
-    {
-      "name": "Consumables for medical equipment",
-      "code": "CONSUMABLES_FOR_MEDICAL_EQUIPMENT"
-    },
-    {
-      "name": "Contraception devices",
-      "code": "CONTRACEPTION_DEVICES"
-    },
-    {
-      "name": "Dressings, gauzes, bandages, pads",
-      "code": "DRESSINGS_GAUZES_BANDAGES_PADS"
-    },
-    {
-      "name": "Endoscopes and related devices",
-      "code": "ENDOSCOPES_AND_RELATED_DEVICES"
-    },
-    {
-      "name": "Imaging / nuclear medicine equipment",
-      "code": "IMAGING___NUCLEAR_MEDICINE_EQUIPMENT"
-    },
-    {
-      "name": "Implantable devices",
-      "code": "IMPLANTABLE_DEVICES"
-    },
-    {
-      "name": "In vitro diagnostic tests",
-      "code": "IN_VITRO_DIAGNOSTIC_TESTS"
-    },
-    {
-      "name": "Infection prevention and control (IPC)",
-      "code": "INFECTION_PREVENTION_AND_CONTROL_IPC"
-    },
-    {
-      "name": "Infusion devices",
-      "code": "INFUSION_DEVICES"
-    },
-    {
-      "name": "Laboratory equipment",
-      "code": "LABORATORY_EQUIPMENT"
-    },
-    {
-      "name": "Measurement devices",
-      "code": "MEASUREMENT_DEVICES"
-    },
-    {
-      "name": "Medical charts/stationery",
-      "code": "MEDICAL_CHARTS_STATIONERY"
-    },
-    {
-      "name": "Medical equipment",
-      "code": "MEDICAL_EQUIPMENT"
-    },
-    {
-      "name": "Medical furniture",
-      "code": "MEDICAL_FURNITURE"
-    },
-    {
-      "name": "Medical gas equipment",
-      "code": "MEDICAL_GAS_EQUIPMENT"
-    },
-    {
-      "name": "Monitoring equipment",
-      "code": "MONITORING_EQUIPMENT"
-    },
-    {
-      "name": "Non-medical devices",
-      "code": "NON-MEDICAL_DEVICES"
-    },
-    {
-      "name": "Oral devices",
-      "code": "ORAL_DEVICES"
-    },
-    {
-      "name": "Personal protective equipment / Radiation protection equipment",
-      "code": "PERSONAL_PROTECTIVE_EQUIPMENT___RADIATION_PROTECTION_EQUIPMENT"
-    },
-    {
-      "name": "Quality assurance / calibration / maintenance devices",
-      "code": "QUALITY_ASSURANCE___CALIBRATION___MAINTENANCE_DEVICES"
-    },
-    {
-      "name": "Radiotherapy-related equipment",
-      "code": "RADIOTHERAPY-RELATED_EQUIPMENT"
-    },
-    {
-      "name": "Rehabilitation devices",
-      "code": "REHABILITATION_DEVICES"
-    },
-    {
-      "name": "Respiratory accessories",
-      "code": "RESPIRATORY_ACCESSORIES"
-    },
-    {
-      "name": "Simulators / Trainers",
-      "code": "SIMULATORS___TRAINERS"
-    },
-    {
-      "name": "Software",
-      "code": "SOFTWARE"
-    },
-    {
-      "name": "Solutions and reagents",
-      "code": "SOLUTIONS_AND_REAGENTS"
-    },
-    {
-      "name": "Surgical instruments, trays and bowls",
-      "code": "SURGICAL_INSTRUMENTS_TRAYS_AND_BOWLS"
-    },
-    {
-      "name": "Sutures",
-      "code": "SUTURES"
-    },
-    {
-      "name": "Syringes and needles",
-      "code": "SYRINGES_AND_NEEDLES"
-    },
-    {
-      "name": "Tubes and cannulae",
-      "code": "TUBES_AND_CANNULAE"
-    },
-    {
-      "name": "Vector control equipment",
-      "code": "VECTOR_CONTROL_EQUIPMENT"
-    },
-    {
-      "name": "Vehicles",
-      "code": "VEHICLES"
-    },
-    {
-      "name": "Waste management products",
-      "code": "WASTE_MANAGEMENT_PRODUCTS"
-    }
-  ],
-  "deviceCategories": [
-    {
-      "name": "Assistive care / Rehabilitation",
-      "code": "ASSISTIVE_CARE_/_REHABILITATION"
-    },
-    {
-      "name": "Conception control",
-      "code": "CONCEPTION_CONTROL"
-    },
-    {
-      "name": "Diagnosis / Measurement / Monitoring",
-      "code": "DIAGNOSIS_/_MEASUREMENT_/_MONITORING"
-    },
-    {
-      "name": "Disinfection / Sterilization / Cleaning",
-      "code": "DISINFECTION_/_STERILIZATION_/_CLEANING"
-    },
-    {
-      "name": "General furniture / equipment",
-      "code": "GENERAL_FURNITURE_/_EQUIPMENT"
-    },
-    {
-      "name": "Healthcare textile",
-      "code": "HEALTHCARE_TEXTILE"
-    },
-    {
-      "name": "Identification / Labeling",
-      "code": "IDENTIFICATION_/_LABELING"
-    },
-    {
-      "name": "Infection prevention and control (IPC) / Protection",
-      "code": "INFECTION_PREVENTION_AND_CONTROL_(IPC)_/_PROTECTION"
-    },
-    {
-      "name": "Quality control",
-      "code": "QUALITY_CONTROL"
-    },
-    {
-      "name": "Training / Simulation",
-      "code": "TRAINING_/_SIMULATION"
-    },
-    {
-      "name": "Treatment / Resuscitation / Palliative care / Surgery",
-      "code": "TREATMENT_/_RESUSCITATION_/_PALLIATIVE_CARE_/_SURGERY"
-    },
-    {
-      "name": "Waste / Disposal",
-      "code": "WASTE_/_DISPOSAL"
-    }
-  ],
-  "deviceFunctions": [
-    {
-      "name": "Basic",
-      "code": "BASIC",
-      "category": "",
-      "score": 0
-    },
-    {
-      "name": "General clinical",
-      "code": "GENERAL_CLINICAL",
-      "category": "",
-      "score": 0
-    },
-    {
-      "name": "Specialized clinical",
-      "code": "SPECIALIZED_CLINICAL",
-      "category": "",
-      "score": 0
-    }
-  ],
-  "deviceApplicationRisks": [
-    {
-      "description": "Reusable",
-      "score_point": 1
-    },
-    {
-      "description": "Single use",
-      "score_point": 2
-    }
-  ],
   "fields": [
     {
       "key": "device_type",
@@ -288,9 +50,8 @@
       ]
     },
     {
-      "key": "service_type",
-      "label": "Service type",
-      "required": true,
+      "key": "device_category",
+      "label": "Device category",
       "allowed_values": [
         "Assistive care / Rehabilitation",
         "Conception control",
@@ -307,9 +68,8 @@
       ]
     },
     {
-      "key": "knowledge_level",
-      "label": "Knowledge level",
-      "required": true,
+      "key": "device_function",
+      "label": "Device function",
       "allowed_values": [
         "Basic",
         "General clinical",
@@ -317,72 +77,16 @@
       ]
     },
     {
-      "key": "reusable",
-      "label": "Reusable",
+      "key": "device_application_risk",
+      "label": "Device application risk",
       "allowed_values": [
         "Reusable",
         "Single use"
       ]
-    },
-    {
-      "key": "sex",
-      "label": "Sex",
-      "allowed_values": [
-        "all",
-        "female",
-        "male"
-      ]
-    },
-    {
-      "key": "delivery_platforms",
-      "label": "Delivery platforms",
-      "allowed_values": [
-        "Community services for primary care",
-        "First-level (district) hospital services",
-        "General outpatient (health post, health center) and outreach services for primary care",
-        "Pre-hospital emergency services",
-        "Second-level and third-level hospital services and specialized outpatient services"
-      ]
-    },
-    {
-      "key": "life_courses",
-      "label": "Life courses",
-      "allowed_values": [
-        "Adolescent (10 to 19 years)",
-        "Adults (20 to 64 years)",
-        "All ages",
-        "Childhood (28 days to 9 years)",
-        "Later adults (over 64 years)",
-        "Neonatal"
-      ]
-    },
-    {
-      "key": "healthcare_settings",
-      "label": "Healthcare settings",
-      "allowed_values": [
-        "Across all healthcare units",
-        "Assistive Technology provision",
-        "Cleaning",
-        "Emergency care",
-        "General services",
-        "General surgery",
-        "Inpatient care",
-        "Intensive care",
-        "Laboratory",
-        "Long-term care",
-        "Maintenance",
-        "Medical imaging",
-        "Oral health care",
-        "Outpatient care",
-        "Pre-hospital care",
-        "Rehabilitation",
-        "Specialized diagnostics",
-        "Specialized surgery",
-        "Specialized treatment"
-      ]
     }
   ],
   "inference": {
+    "rules": [],
     "genericLegacyHeads": [
       "analyser",
       "analyzer",
@@ -430,8 +134,5 @@
       "sterile"
     ]
   },
-  "source": "devices.xlsx MeDevIS 2025 v2.1 (2653 rows)",
-  "counts": {
-    "total_devices": 2653
-  }
+  "source": "devices.xlsx MeDevIS 2025 v2.1 (2653 rows)"
 }

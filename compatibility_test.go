@@ -5,195 +5,99 @@ import (
 	"testing"
 )
 
-// TestOvaholCompatibility ensures the ontology's output is always
-// compatible with what Ovahol expects. If Ovahol's seed/lookup changes,
-// these tests fail — that's intentional, it signals drift.
+// TestOvaholCompatibility ensures that when ontology is run against Ovahol's
+// taxonomy, its output is always compatible with what Ovahol expects. Ovahol's
+// vocabulary is no longer vendored in this repo — it lives in
+// examples/taxonomies/ovahol.json (for testing only). If Ovahol's seed/lookup
+// changes, either this file or that taxonomy must be updated — that signals drift.
 //
 // Source of truth for expected values: backend/internal/seed/lookup/data.go
-// in the ovahol monorepo. The ontology vendors these values statically in
-// taxonomy.go so it has no runtime dependency on the monorepo, but the
-// values must stay identical.
+// in the ovahol monorepo.
 
-var expectedOvaholDeviceTypes = []DeviceType{
-	{Name: "Monitoring & Measurement Devices", Code: "MONITORING_MEASUREMENT_DEVICES"},
-	{Name: "Diagnostic & Imaging Devices", Code: "DIAGNOSTIC_IMAGING_DEVICES"},
-	{Name: "Treatment, Surgical & Life Support Devices", Code: "TREATMENT_SURGICAL_LIFE_SUPPORT_DEVICES"},
-	{Name: "Laboratory & IVD Equipment", Code: "LABORATORY_IVD_EQUIPMENT"},
-	{Name: "Medical Gas & Respiratory Devices", Code: "MEDICAL_GAS_RESPIRATORY_DEVICES"},
-	{Name: "Sterilization & Infection Control Devices", Code: "STERILIZATION_INFECTION_CONTROL_DEVICES"},
-	{Name: "Support Equipment & Furniture", Code: "SUPPORT_EQUIPMENT_FURNITURE"},
-	{Name: "Consumables & Accessories", Code: "CONSUMABLES_ACCESSORIES"},
-}
-
-var expectedOvaholDeviceFunctions = []DeviceFunction{
-	{Name: "Life Support", Code: "LIFE_SUPPORT", Category: "Therapeutic", Score: 10},
-	{Name: "Surgical and Intensive Care", Code: "SURGICAL_INTENSIVE_CARE", Category: "Therapeutic", Score: 9},
-	{Name: "Physical Therapy and Treatment", Code: "PHYSICAL_THERAPY_TREATMENT", Category: "Therapeutic", Score: 8},
-	{Name: "Surgical and Intensive Care Monitoring", Code: "CRITICAL_CARE_MONITORING", Category: "Diagnostic", Score: 7},
-	{Name: "Additional Physiological Monitoring and Diagnostic", Code: "GENERAL_PHYSIOLOGICAL_MONITORING", Category: "Diagnostic", Score: 6},
-	{Name: "Analytical Laboratory", Code: "ANALYTICAL_LABORATORY", Category: "Analytical", Score: 5},
-	{Name: "Laboratory Accessories", Code: "LABORATORY_ACCESSORIES", Category: "Analytical", Score: 4},
-	{Name: "Computers and Related", Code: "COMPUTERS_AND_IT", Category: "Analytical", Score: 3},
-	{Name: "Patient Related and Other", Code: "PATIENT_RELATED_OTHER", Category: "Miscellaneous", Score: 2},
-}
-
-var expectedOvaholDeviceRisks = []DeviceApplicationRisk{
-	{Description: "Potential patient death", ScorePoint: 5},
-	{Description: "Potential patient or operator injury", ScorePoint: 4},
-	{Description: "Inappropriate therapy or misdiagnosis", ScorePoint: 3},
-	{Description: "Equipment damage", ScorePoint: 2},
-	{Description: "No significant identified risk", ScorePoint: 1},
-}
-
-func TestCompatibility_DeviceTypes(t *testing.T) {
-	if len(OvaholDeviceTypes) != len(expectedOvaholDeviceTypes) {
-		t.Fatalf("device types count drifted: got %d, want %d. If ovahol added/removed a type, update both repos.", len(OvaholDeviceTypes), len(expectedOvaholDeviceTypes))
+func loadOvaholTax(t *testing.T) *Taxonomy {
+	t.Helper()
+	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	if err != nil {
+		t.Fatalf("LoadTaxonomyFile(ovahol.json): %v", err)
 	}
-	for i, want := range expectedOvaholDeviceTypes {
-		got := OvaholDeviceTypes[i]
-		if got.Name != want.Name || got.Code != want.Code {
-			t.Errorf("device type [%d] mismatch: got %+v, want %+v", i, got, want)
+	return tax
+}
+
+func allowedSet(tax *Taxonomy, key string) map[string]bool {
+	set := map[string]bool{}
+	if fd := tax.Field(key); fd != nil {
+		for _, v := range fd.AllowedValues {
+			set[v] = true
 		}
 	}
-	validNames := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validNames[dt.Name] = true
+	return set
+}
+
+func TestCompatibility_Fields(t *testing.T) {
+	tax := loadOvaholTax(t)
+	wantCounts := map[string]int{
+		FieldDeviceType:            8,
+		FieldDeviceCategory:        4,
+		FieldDeviceFunction:        9,
+		FieldDeviceApplicationRisk: 5,
 	}
-	for code, name := range TypeByCode {
-		if !validNames[name] {
-			t.Errorf("TypeByCode[%q] = %q is not a valid Ovahol device type", code, name)
+	for key, want := range wantCounts {
+		fd := tax.Field(key)
+		if fd == nil {
+			t.Fatalf("ovahol taxonomy missing field %q", key)
+		}
+		if len(fd.AllowedValues) != want {
+			t.Errorf("field %q has %d allowed_values, want %d", key, len(fd.AllowedValues), want)
 		}
 	}
 }
 
-func TestCompatibility_DeviceFunctions(t *testing.T) {
-	if len(DeviceFunctions) != len(expectedOvaholDeviceFunctions) {
-		t.Fatalf("device functions count drifted: got %d, want %d", len(DeviceFunctions), len(expectedOvaholDeviceFunctions))
+// TestCompatibility_Rules ensures every rule in Ovahol's taxonomy only ever
+// assigns values that are within that field's declared controlled
+// vocabulary — the same guarantee the old hardcoded FamilyRule/TypeDefaults
+// validity checks gave, now expressed generically over Rule.Set.
+func TestCompatibility_Rules(t *testing.T) {
+	tax := loadOvaholTax(t)
+	if tax.Inference == nil || len(tax.Inference.Rules) == 0 {
+		t.Fatal("ovahol taxonomy has no inference rules")
 	}
-	for i, want := range expectedOvaholDeviceFunctions {
-		got := DeviceFunctions[i]
-		if got.Name != want.Name || got.Code != want.Code || got.Category != want.Category || got.Score != want.Score {
-			t.Errorf("device function [%d] mismatch: got %+v, want %+v", i, got, want)
+	validByField := map[string]map[string]bool{
+		FieldDeviceType:            allowedSet(tax, FieldDeviceType),
+		FieldDeviceCategory:        allowedSet(tax, FieldDeviceCategory),
+		FieldDeviceFunction:        allowedSet(tax, FieldDeviceFunction),
+		FieldDeviceApplicationRisk: allowedSet(tax, FieldDeviceApplicationRisk),
+		FieldDeviceFamily:          allowedSet(tax, FieldDeviceFamily),
+	}
+	for i, r := range tax.Inference.Rules {
+		if len(r.Keywords) == 0 && len(r.SourceTypes) == 0 && len(r.Requires) == 0 {
+			t.Errorf("rules[%d] matches unconditionally (no keywords, source_types, or requires)", i)
 		}
-	}
-	validFuncNames := make(map[string]bool, len(DeviceFunctions))
-	for _, fn := range DeviceFunctions {
-		validFuncNames[fn.Name] = true
-	}
-	for code, name := range FunctionByCode {
-		if !validFuncNames[name] {
-			t.Errorf("FunctionByCode[%q] = %q is not a valid device function", code, name)
+		for field, value := range r.Set {
+			valid, known := validByField[field]
+			if !known || value == "" {
+				continue
+			}
+			if !valid[value] {
+				t.Errorf("rules[%d] sets %s=%q, not in that field's allowed_values", i, field, value)
+			}
 		}
-	}
-}
-
-func TestCompatibility_DeviceRisks(t *testing.T) {
-	if len(DeviceApplicationRisks) != len(expectedOvaholDeviceRisks) {
-		t.Fatalf("device risks count drifted: got %d, want %d", len(DeviceApplicationRisks), len(expectedOvaholDeviceRisks))
-	}
-	for i, want := range expectedOvaholDeviceRisks {
-		got := DeviceApplicationRisks[i]
-		if got.Description != want.Description || got.ScorePoint != want.ScorePoint {
-			t.Errorf("device risk [%d] mismatch: got %+v, want %+v", i, got, want)
-		}
-	}
-}
-
-func TestCompatibility_FamilyRules(t *testing.T) {
-	validTypes := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validTypes[dt.Name] = true
-	}
-	validFuncs := make(map[string]bool, len(DeviceFunctions))
-	for _, fn := range DeviceFunctions {
-		validFuncs[fn.Name] = true
-	}
-	validRisks := make(map[string]bool, len(DeviceApplicationRisks))
-	for _, r := range DeviceApplicationRisks {
-		validRisks[r.Description] = true
-	}
-	for i, rule := range FamilyRules {
-		if !validTypes[rule.Type] {
-			t.Errorf("FamilyRules[%d] (%s / %s) has invalid Type %q", i, rule.Type, rule.Family, rule.Type)
-		}
-		if !validFuncs[rule.Function] {
-			t.Errorf("FamilyRules[%d] (%s / %s) has invalid Function %q", i, rule.Type, rule.Family, rule.Function)
-		}
-		if !validRisks[rule.Risk] {
-			t.Errorf("FamilyRules[%d] (%s / %s) has invalid Risk %q", i, rule.Type, rule.Family, rule.Risk)
-		}
-		if rule.Family == "" {
-			t.Errorf("FamilyRules[%d] has empty Family", i)
-		}
-		if rule.CommonName == "" {
-			t.Errorf("FamilyRules[%d] (%s / %s) has empty CommonName", i, rule.Type, rule.Family)
-		}
-		if rule.CanonicalName == "" {
-			t.Errorf("FamilyRules[%d] (%s / %s) has empty CanonicalName", i, rule.Type, rule.Family)
-		}
-	}
-}
-
-func TestCompatibility_SpecificNameRules(t *testing.T) {
-	validTypes := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validTypes[dt.Name] = true
-	}
-	for i, rule := range SpecificNameRules {
-		if rule.Type != "" && !validTypes[rule.Type] {
-			t.Errorf("SpecificNameRules[%d] (%v) has invalid Type %q", i, rule.Keywords, rule.Type)
-		}
-		if len(rule.Keywords) == 0 {
-			t.Errorf("SpecificNameRules[%d] has no Keywords", i)
-		}
-		if rule.CommonName == "" {
-			t.Errorf("SpecificNameRules[%d] has empty CommonName", i)
-		}
-	}
-}
-
-func TestCompatibility_TypeDefaults(t *testing.T) {
-	validTypes := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validTypes[dt.Name] = true
-	}
-	validFuncs := make(map[string]bool, len(DeviceFunctions))
-	for _, fn := range DeviceFunctions {
-		validFuncs[fn.Name] = true
-	}
-	validRisks := make(map[string]bool, len(DeviceApplicationRisks))
-	for _, r := range DeviceApplicationRisks {
-		validRisks[r.Description] = true
-	}
-	if len(OvaholTypeDefaults) != len(OvaholDeviceTypes) {
-		t.Errorf("OvaholTypeDefaults has %d entries, want %d (one per device type)", len(OvaholTypeDefaults), len(OvaholDeviceTypes))
-	}
-	for typeName, def := range OvaholTypeDefaults {
-		if !validTypes[typeName] {
-			t.Errorf("OvaholTypeDefaults key %q is not a valid device type", typeName)
-		}
-		if !validFuncs[def.Function] {
-			t.Errorf("OvaholTypeDefaults[%q].Function %q is not a valid function", typeName, def.Function)
-		}
-		if !validRisks[def.Risk] {
-			t.Errorf("OvaholTypeDefaults[%q].Risk %q is not a valid risk", typeName, def.Risk)
+		for field, value := range r.Requires {
+			valid, known := validByField[field]
+			if !known || value == "" {
+				continue
+			}
+			if !valid[value] {
+				t.Errorf("rules[%d] requires %s=%q, not in that field's allowed_values", i, field, value)
+			}
 		}
 	}
 }
 
 func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
-	validTypes := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validTypes[dt.Name] = true
-	}
-	validFuncs := make(map[string]bool, len(DeviceFunctions))
-	for _, fn := range DeviceFunctions {
-		validFuncs[fn.Name] = true
-	}
-	validRisks := make(map[string]bool, len(DeviceApplicationRisks))
-	for _, r := range DeviceApplicationRisks {
-		validRisks[r.Description] = true
-	}
+	tax := loadOvaholTax(t)
+	validTypes := allowedSet(tax, FieldDeviceType)
+	validFuncs := allowedSet(tax, FieldDeviceFunction)
+	validRisks := allowedSet(tax, FieldDeviceApplicationRisk)
 	samples := []Input{
 		{DeviceName: "Patient monitor", SourceType: "monitoring equipment"},
 		{DeviceName: "ECG machine, 12-lead", SourceType: "monitoring equipment"},
@@ -212,7 +116,7 @@ func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
 		{DeviceName: "Gloves, sterile", SourceType: "medical equipment"},
 	}
 	for _, in := range samples {
-		result := Normalize(in)
+		result := NormalizeWithTaxonomy(in, tax)
 		if !result.IsValid() {
 			t.Errorf("Normalize(%+v) returned invalid (confidence=%s, source=%s) — sample should be valid", in, result.Confidence, result.MappingSource)
 			continue
@@ -239,10 +143,8 @@ func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
 }
 
 func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
-	validTypes := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validTypes[dt.Name] = true
-	}
+	tax := loadOvaholTax(t)
+	validTypes := allowedSet(tax, FieldDeviceType)
 	// Inputs whose Name would ideally be vendor-neutral. The library
 	// does best-effort humanization but may retain some vendor tokens for
 	// highly vendor-specific names — that's a known improvement area, not a
@@ -253,7 +155,7 @@ func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
 		{DeviceName: "Infusion pump, volumetric", SourceType: "infusion devices"},
 	}
 	for _, in := range inputs {
-		result := Normalize(in)
+		result := NormalizeWithTaxonomy(in, tax)
 		if !result.IsValid() {
 			t.Errorf("Normalize(%+v) unexpectedly invalid", in)
 			continue
@@ -269,11 +171,12 @@ func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
 }
 
 func TestCompatibility_JSONInterchangeRoundTrips(t *testing.T) {
+	tax := loadOvaholTax(t)
 	inputJSON := `[
 		{"device_name": "ECG machine", "source_type": "monitoring equipment"},
 		{"device_name": "Infusion pump", "source_type": "infusion devices", "emdn_term": "Infusion pumps"}
 	]`
-	results, err := NormalizeJSON([]byte(inputJSON))
+	results, err := NormalizeJSONWithTaxonomy([]byte(inputJSON), tax)
 	if err != nil {
 		t.Fatalf("NormalizeJSON failed: %v", err)
 	}
@@ -304,47 +207,39 @@ func TestCompatibility_CSVAndAPIImportHeaders(t *testing.T) {
 		"Device application risk", "Legacy source name", "Source device type",
 		"EMDN code", "EMDN term",
 	}
-	if len(DeviceSheetHeaders) != len(wantSheetHeaders) {
-		t.Fatalf("DeviceSheetHeaders length %d, want %d", len(DeviceSheetHeaders), len(wantSheetHeaders))
+	if len(DefaultDeviceSheetHeaders) != len(wantSheetHeaders) {
+		t.Fatalf("DefaultDeviceSheetHeaders length %d, want %d", len(DefaultDeviceSheetHeaders), len(wantSheetHeaders))
 	}
 	for i, want := range wantSheetHeaders {
-		if DeviceSheetHeaders[i] != want {
-			t.Errorf("DeviceSheetHeaders[%d] = %q, want %q", i, DeviceSheetHeaders[i], want)
+		if DefaultDeviceSheetHeaders[i] != want {
+			t.Errorf("DefaultDeviceSheetHeaders[%d] = %q, want %q", i, DefaultDeviceSheetHeaders[i], want)
 		}
 	}
 	wantAPIHeaders := []string{"name", "device_type", "device_category", "device_function", "device_application_risk", "emdn_code", "emdn_term"}
-	if len(APIImportHeaders) != len(wantAPIHeaders) {
-		t.Fatalf("APIImportHeaders length %d, want %d", len(APIImportHeaders), len(wantAPIHeaders))
+	if len(DefaultAPIImportHeaders) != len(wantAPIHeaders) {
+		t.Fatalf("DefaultAPIImportHeaders length %d, want %d", len(DefaultAPIImportHeaders), len(wantAPIHeaders))
 	}
 	for i, want := range wantAPIHeaders {
-		if APIImportHeaders[i] != want {
-			t.Errorf("APIImportHeaders[%d] = %q, want %q", i, APIImportHeaders[i], want)
+		if DefaultAPIImportHeaders[i] != want {
+			t.Errorf("DefaultAPIImportHeaders[%d] = %q, want %q", i, DefaultAPIImportHeaders[i], want)
 		}
 	}
 }
 
 func TestCompatibility_ToAPIImportRecordsAreValid(t *testing.T) {
-	results := NormalizeBatch([]Input{
+	tax := loadOvaholTax(t)
+	results := NormalizeBatchWithTaxonomy([]Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 		{DeviceName: "Infusion pump", SourceType: "infusion devices"},
 		{DeviceName: "Chemistry analyzer", SourceType: "laboratory equipment"},
-	})
+	}, tax)
 	records := ToAPIImportRecords(results)
 	if len(records) == 0 {
 		t.Fatal("ToAPIImportRecords returned no records for valid inputs")
 	}
-	validTypes := make(map[string]bool, len(OvaholDeviceTypes))
-	for _, dt := range OvaholDeviceTypes {
-		validTypes[dt.Name] = true
-	}
-	validFuncs := make(map[string]bool, len(DeviceFunctions))
-	for _, fn := range DeviceFunctions {
-		validFuncs[fn.Name] = true
-	}
-	validRisks := make(map[string]bool, len(DeviceApplicationRisks))
-	for _, r := range DeviceApplicationRisks {
-		validRisks[r.Description] = true
-	}
+	validTypes := allowedSet(tax, FieldDeviceType)
+	validFuncs := allowedSet(tax, FieldDeviceFunction)
+	validRisks := allowedSet(tax, FieldDeviceApplicationRisk)
 	for _, rec := range records {
 		if !validTypes[rec.DeviceType] {
 			t.Errorf("APIImportRecord %q has invalid device_type %q", rec.Name, rec.DeviceType)

@@ -4,9 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/ovahol/ontology"
-	"github.com/ovahol/ontology/taxonomy"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 	flag.StringVar(&fromPath, "from", "", "input workbook path")
 	flag.StringVar(&toPath, "to", "", "output workbook path")
 	flag.StringVar(&taxonomyPath, "taxonomy", "", "path to taxonomy JSON file")
-	flag.StringVar(&taxonomyDir, "taxonomy-dir", "", "directory containing taxonomy JSON files")
+	flag.StringVar(&taxonomyDir, "taxonomy-dir", "", "directory containing taxonomy JSON files (first *.json found is used)")
 	flag.Parse()
 
 	// positional compat: ontology <input.xlsx> <output.xlsx>
@@ -38,53 +38,59 @@ func main() {
 		os.Exit(2)
 	}
 
-	// Vocab-less: vendor must supply taxonomy via --taxonomy or --taxonomy-dir.
-	if taxonomyPath == "" && taxonomyDir == "" {
-		fmt.Fprintf(os.Stderr, "error: ontology is vocab-less — supply --taxonomy <file> or --taxonomy-dir <dir>\n")
-		fmt.Fprintf(os.Stderr, "  example: %s --taxonomy examples/taxonomies/ovahol.json %s %s\n", os.Args[0], fromPath, toPath)
-		os.Exit(2)
-	}
-	resolved := taxonomyPath
-	if taxonomyPath != "" && taxonomyDir != "" {
-		if _, err := os.Stat(taxonomyPath); os.IsNotExist(err) {
-			candidate := taxonomyDir + "/" + taxonomyPath
-			if _, err2 := os.Stat(candidate); err2 == nil {
-				resolved = candidate
-			} else if p, err3 := taxonomy.ResolvePath(taxonomyPath, taxonomyDir); err3 == nil {
-				resolved = p
-			}
-		}
-	} else if taxonomyPath == "" && taxonomyDir != "" {
-		p, err := taxonomy.ResolvePath("", taxonomyDir)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			os.Exit(1)
-		}
-		resolved = p
-	}
-	t, err := taxonomy.LoadFile(resolved)
+	// ontology is an engine: vendors supply their own taxonomy via --taxonomy
+	// or --taxonomy-dir. If none is given, the embedded WHO/MeDevIS reference
+	// vocabulary is used.
+	var tax *ontology.Taxonomy
+	resolved, err := resolveTaxonomyPath(taxonomyPath, taxonomyDir)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
+	if resolved == "" {
+		tax = ontology.DefaultTaxonomy()
+	} else {
+		tax, err = ontology.LoadTaxonomyFile(resolved)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			os.Exit(1)
+		}
+	}
 
-	// Vocab-less workbook — taxonomy is required.
-	var csvPath string
-	csvPath, err = ontology.NormalizeWorkbookWithTaxonomy(fromPath, toPath, t)
+	csvPath, err := ontology.NormalizeWorkbookWithTaxonomy(fromPath, toPath, tax)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 	fmt.Printf("normalized workbook written to %s\n", toPath)
 	fmt.Printf("api import csv written to %s\n", csvPath)
-
-	if err := validateCompliance(); err != nil {
-		fmt.Fprintf(os.Stderr, "validation warning: %v\n", err)
-	}
 }
 
-func validateCompliance() error {
-	// Vocab-less: ontology no longer validates built-in counts. Vendors validate
-	// via Taxonomy.Validate() on their own file. Keep stub for compat.
-	return nil
+// resolveTaxonomyPath picks the taxonomy file to load: taxonomyPath if set
+// (joined with taxonomyDir when relative and taxonomyDir is given), else the
+// first *.json file in taxonomyDir, else "" (meaning: use the default).
+func resolveTaxonomyPath(taxonomyPath, taxonomyDir string) (string, error) {
+	if taxonomyPath != "" {
+		if filepath.IsAbs(taxonomyPath) || taxonomyDir == "" {
+			return taxonomyPath, nil
+		}
+		joined := filepath.Join(taxonomyDir, taxonomyPath)
+		if _, err := os.Stat(joined); err == nil {
+			return joined, nil
+		}
+		return taxonomyPath, nil
+	}
+	if taxonomyDir == "" {
+		return "", nil
+	}
+	entries, err := os.ReadDir(taxonomyDir)
+	if err != nil {
+		return "", fmt.Errorf("read taxonomy dir %s: %w", taxonomyDir, err)
+	}
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".json" {
+			return filepath.Join(taxonomyDir, e.Name()), nil
+		}
+	}
+	return "", fmt.Errorf("no taxonomy file found in %s", taxonomyDir)
 }

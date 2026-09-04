@@ -42,80 +42,51 @@ func HasAny(text string, tokens []string) bool {
 	return false
 }
 
-// InferFromKeywords infers the device type from keywords under default taxonomy.
-func InferFromKeywords(text string) string {
-	return InferFromKeywordsFor(text, nil)
-}
-
-// InferFromKeywordsFor infers the device type from text using the provided taxonomy.
-func InferFromKeywordsFor(text string, tax *Taxonomy) string {
-	if tax == nil {
-		tax = DefaultTaxonomy()
-	}
-	if tax.Inference == nil || len(tax.Inference.TypeByKeyword) == 0 {
-		return ""
-	}
-	for _, entry := range tax.Inference.TypeByKeyword {
-		if HasAny(text, entry.Keywords) {
-			if tax.Inference.TypeByCode != nil {
-				if v, ok := tax.Inference.TypeByCode[entry.Type]; ok {
-					return v
-				}
-			}
-			if entry.Type != "" {
-				if v, ok := TypeByCode[entry.Type]; ok {
-					return v
-				}
-				return entry.Type
-			}
+// ruleMatches reports whether rule r fires given the text/source extracted
+// from the input and the fields resolved so far by earlier rules.
+func ruleMatches(r *Rule, text, source string, fields map[string]string) bool {
+	for k, v := range r.Requires {
+		if fields[k] != v {
+			return false
 		}
 	}
-	return ""
+	if len(r.ExcludeKeywords) > 0 && text != "" && HasAny(text, r.ExcludeKeywords) {
+		return false
+	}
+	// A rule with only Requires (no Keywords/SourceTypes) is a pure "defaults"
+	// rule: it fires whenever its Requires are satisfied.
+	matched := len(r.Requires) > 0 && len(r.Keywords) == 0 && len(r.SourceTypes) == 0
+	if len(r.Keywords) > 0 && text != "" && HasAny(text, r.Keywords) {
+		matched = true
+	}
+	if len(r.SourceTypes) > 0 && source != "" && HasAny(source, r.SourceTypes) {
+		matched = true
+	}
+	return matched
 }
 
-// IsSupportedSourceType checks if sourceType is recognized under default taxonomy.
-func IsSupportedSourceType(sourceType string) bool {
-	return IsSupportedSourceTypeFor(sourceType, nil)
-}
-
-// IsSupportedSourceTypeFor checks if sourceType is recognized under the given taxonomy.
-func IsSupportedSourceTypeFor(sourceType string, tax *Taxonomy) bool {
+// ApplyRulesFor runs tax's ordered rule list against one input, once, top to
+// bottom. Rules are generic: they know nothing about "device type" or
+// "family" — they just assign whatever field keys the vendor's Set map
+// names. The first rule to set a given field wins; later rules only fill in
+// fields still unset, which is how a vendor expresses multi-stage inference
+// (resolve dimension A, then derive B from A via Requires, then C from B) —
+// purely through rule ordering, not engine code.
+//
+// After the ordered pass, any field still unset is given one more chance: if
+// the taxonomy declares AllowedValues for that field and the normalized
+// source type matches one of them directly, that value is used. This lets a
+// vendor whose source-type strings already line up with their own
+// vocabulary (e.g. WHO/MeDevIS) get classification for free, with zero
+// rules.
+func ApplyRulesFor(deviceName, sourceType, emdnTerm string, tax *Taxonomy) (fields map[string]string, name, canonicalName string, specific bool) {
+	fields = map[string]string{}
 	if tax == nil {
-		tax = DefaultTaxonomy()
-	}
-	norm := Normalized(sourceType)
-	if tax.Inference != nil && len(tax.Inference.SupportedSourceTypes) > 0 {
-		_, ok := tax.Inference.SupportedSourceTypes[norm]
-		return ok
-	}
-	if tax.Inference != nil && len(tax.Inference.SourceTypeMap) > 0 {
-		_, ok := tax.Inference.SourceTypeMap[norm]
-		return ok
-	}
-	for _, dt := range tax.DeviceTypes {
-		if Normalized(dt.Name) == norm || Normalized(dt.Code) == norm {
-			return true
-		}
-	}
-	return false
-}
-
-// InferDeviceType infers the high-level classification under default taxonomy.
-func InferDeviceType(deviceName, sourceType, emdnTerm string) string {
-	return InferDeviceTypeFor(deviceName, sourceType, emdnTerm, nil)
-}
-
-// InferDeviceTypeFor infers the high-level classification under the given taxonomy.
-func InferDeviceTypeFor(deviceName, sourceType, emdnTerm string, tax *Taxonomy) string {
-	if tax == nil {
-		tax = DefaultTaxonomy()
+		return fields, "", "", false
 	}
 	parts := []string{}
 	if deviceName != "" {
 		parts = append(parts, deviceName)
-	}
-	if sourceType != "" {
-		parts = append(parts, sourceType)
 	}
 	if emdnTerm != "" {
 		parts = append(parts, emdnTerm)
@@ -123,184 +94,99 @@ func InferDeviceTypeFor(deviceName, sourceType, emdnTerm string, tax *Taxonomy) 
 	text := Normalized(strings.Join(parts, " "))
 	source := Normalized(sourceType)
 
-	// 1. Keyword-based matching
-	keywordMatch := InferFromKeywordsFor(text, tax)
-	if keywordMatch != "" {
-		return keywordMatch
-	}
-
-	// 2. Direct source type map
-	if tax.Inference != nil && len(tax.Inference.SourceTypeMap) > 0 {
-		if v, ok := tax.Inference.SourceTypeMap[source]; ok {
-			return v
+	if tax.Inference != nil {
+		for i := range tax.Inference.Rules {
+			r := &tax.Inference.Rules[i]
+			if !ruleMatches(r, text, source, fields) {
+				continue
+			}
+			for k, v := range r.Set {
+				if fields[k] == "" {
+					fields[k] = v
+				}
+			}
+			if r.Name != "" && name == "" {
+				name = r.Name
+				// Only a rule that matches independent of any prior
+				// resolution (no Requires) counts as "specific" — a rule
+				// gated by Requires is by definition a fallback/default for
+				// whatever it requires, and shouldn't outrank a legacy-
+				// derived name just because it also happens to have
+				// Keywords/SourceTypes.
+				if len(r.Requires) == 0 && (len(r.Keywords) > 0 || len(r.SourceTypes) > 0) {
+					specific = true
+				}
+			}
+			if r.CanonicalName != "" && canonicalName == "" {
+				canonicalName = r.CanonicalName
+			}
 		}
 	}
 
-	// 3. Direct match in taxonomy DeviceTypes
-	for _, dt := range tax.DeviceTypes {
-		if Normalized(dt.Name) == source || Normalized(dt.Code) == source {
-			return dt.Name
-		}
-	}
-
-	// 4. Match in taxonomy Fields allowed values
-	for _, f := range tax.Fields {
-		if f.Key == FieldDeviceType || f.Required {
+	if source != "" {
+		for _, f := range tax.Fields {
+			if fields[f.Key] != "" || len(f.AllowedValues) == 0 {
+				continue
+			}
 			for _, val := range f.AllowedValues {
 				if Normalized(val) == source {
-					return val
+					fields[f.Key] = val
+					break
 				}
 			}
 		}
 	}
 
-	return ""
+	return fields, name, canonicalName, specific
 }
 
-// InferFamilyRule matches a FamilyRule under default taxonomy.
-func InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType string) *FamilyRule {
-	return InferFamilyRuleFor(deviceName, sourceType, emdnTerm, deviceType, nil)
-}
-
-// InferFamilyRuleFor matches a FamilyRule under the given taxonomy.
-func InferFamilyRuleFor(deviceName, sourceType, emdnTerm, deviceType string, tax *Taxonomy) *FamilyRule {
-	if deviceType == "" {
-		return nil
-	}
+// DeriveFieldFor resolves targetKey by evaluating tax's Requires-gated rules
+// against a synthetic fields map seeded with fromKey=fromValue. This lets a
+// caller who already knows one dimension (e.g. a catalog hit that supplies
+// device_function but not device_category) derive a dependent dimension
+// without re-running full input matching.
+func DeriveFieldFor(fromKey, fromValue, targetKey string, tax *Taxonomy) string {
 	if tax == nil {
 		tax = DefaultTaxonomy()
 	}
-	if tax.Inference == nil || len(tax.Inference.FamilyRules) == 0 {
-		return nil
+	if tax.Inference == nil || fromValue == "" {
+		return ""
 	}
-	parts := []string{}
-	if deviceName != "" {
-		parts = append(parts, deviceName)
-	}
-	if emdnTerm != "" {
-		parts = append(parts, emdnTerm)
-	}
-	text := Normalized(strings.Join(parts, " "))
-	source := Normalized(sourceType)
-	for i := range tax.Inference.FamilyRules {
-		r := &tax.Inference.FamilyRules[i]
-		if r.Type != deviceType {
+	fields := map[string]string{fromKey: fromValue}
+	for i := range tax.Inference.Rules {
+		r := &tax.Inference.Rules[i]
+		if len(r.Requires) == 0 {
 			continue
 		}
-		if len(r.SourceTypes) > 0 && source != "" {
-			if HasAny(source, r.SourceTypes) {
-				return r
+		ok := true
+		for k, v := range r.Requires {
+			if fields[k] != v {
+				ok = false
+				break
 			}
 		}
-		if len(r.Keywords) > 0 && text != "" {
-			if HasAny(text, r.Keywords) {
-				return r
-			}
-		}
-	}
-	return nil
-}
-
-// InferSpecificNameRule matches a SpecificNameRule under default taxonomy.
-func InferSpecificNameRule(deviceName, sourceType, emdnTerm string) *SpecificNameRule {
-	return InferSpecificNameRuleFor(deviceName, sourceType, emdnTerm, nil)
-}
-
-// InferSpecificNameRuleFor matches a SpecificNameRule under the given taxonomy.
-func InferSpecificNameRuleFor(deviceName, sourceType, emdnTerm string, tax *Taxonomy) *SpecificNameRule {
-	if tax == nil {
-		tax = DefaultTaxonomy()
-	}
-	if tax.Inference == nil || len(tax.Inference.SpecificNameRules) == 0 {
-		return nil
-	}
-	parts := []string{}
-	if deviceName != "" {
-		parts = append(parts, deviceName)
-	}
-	if sourceType != "" {
-		parts = append(parts, sourceType)
-	}
-	if emdnTerm != "" {
-		parts = append(parts, emdnTerm)
-	}
-	text := Normalized(strings.Join(parts, " "))
-	for i := range tax.Inference.SpecificNameRules {
-		r := &tax.Inference.SpecificNameRules[i]
-		if len(r.ExcludeKeywords) > 0 && HasAny(text, r.ExcludeKeywords) {
+		if !ok {
 			continue
 		}
-		if HasAny(text, r.Keywords) {
-			return r
+		if v, has := r.Set[targetKey]; has && fields[targetKey] == "" {
+			fields[targetKey] = v
 		}
 	}
-	return nil
+	return fields[targetKey]
 }
 
-// InferredDefaults holds default metadata resolved from inference rules.
-type InferredDefaults struct {
-	Family            string
-	Function          string
-	Risk              string
-	CommonNameHint    string
-	CanonicalNameHint string
-}
-
-// InferDefaults infers default dimensions under default taxonomy.
-func InferDefaults(deviceName, sourceType, emdnTerm, deviceType string) InferredDefaults {
-	return InferDefaultsFor(deviceName, sourceType, emdnTerm, deviceType, nil)
-}
-
-// InferDefaultsFor infers default dimensions under the given taxonomy.
-func InferDefaultsFor(deviceName, sourceType, emdnTerm, deviceType string, tax *Taxonomy) InferredDefaults {
-	if tax == nil {
-		tax = DefaultTaxonomy()
-	}
-	var defaults InferredDefaults
-	if tax.Inference != nil && tax.Inference.TypeDefaults != nil {
-		if d, ok := tax.Inference.TypeDefaults[deviceType]; ok {
-			defaults = InferredDefaults{
-				Function: d.Function,
-				Risk:     d.Risk,
-			}
-		}
-	}
-	if rule := InferFamilyRuleFor(deviceName, sourceType, emdnTerm, deviceType, tax); rule != nil {
-		if rule.Family != "" {
-			defaults.Family = rule.Family
-		}
-		if rule.Function != "" {
-			defaults.Function = rule.Function
-		}
-		if rule.Risk != "" {
-			defaults.Risk = rule.Risk
-		}
-		if rule.CommonName != "" {
-			defaults.CommonNameHint = rule.CommonName
-		}
-		if rule.CanonicalName != "" {
-			defaults.CanonicalNameHint = rule.CanonicalName
-		}
-	}
-	return defaults
-}
-
-// CategoryForFunction returns category under default taxonomy.
+// CategoryForFunction derives device_category from device_function under the
+// default taxonomy. Kept as a named convenience since it's the one
+// cross-field derivation catalog.go needs when a catalog entry supplies a
+// function but not a category.
 func CategoryForFunction(functionName string) string {
 	return CategoryForFunctionFor(functionName, nil)
 }
 
-// CategoryForFunctionFor returns category under the given taxonomy.
+// CategoryForFunctionFor derives device_category from device_function under
+// the given taxonomy.
 func CategoryForFunctionFor(functionName string, tax *Taxonomy) string {
-	if tax == nil {
-		tax = DefaultTaxonomy()
-	}
-	for _, fn := range tax.DeviceFunctions {
-		if fn.Name == functionName {
-			return fn.Category
-		}
-	}
-	return ""
+	return DeriveFieldFor(FieldDeviceFunction, functionName, FieldDeviceCategory, tax)
 }
 
 // CleanLegacySegment removes descriptor phrases and unit artifacts under default taxonomy.
@@ -319,10 +205,6 @@ func CleanLegacySegmentFor(text string, tax *Taxonomy) string {
 	var phrases []string
 	if tax.Inference != nil && len(tax.Inference.LegacyDescriptorPhrases) > 0 {
 		phrases = tax.Inference.LegacyDescriptorPhrases
-	} else {
-		for p := range LegacyDescriptorPhrases {
-			phrases = append(phrases, p)
-		}
 	}
 	cleaned := text
 	for _, phrase := range phrases {
@@ -428,9 +310,8 @@ func InferCommonNameFromLegacyFor(legacySourceName string, tax *Taxonomy) string
 	firstWords := strings.Fields(first)
 	head := strings.ToLower(firstWords[len(firstWords)-1])
 
-	heads := GenericLegacyHeads
+	heads := make(map[string]struct{})
 	if tax.Inference != nil && len(tax.Inference.GenericLegacyHeads) > 0 {
-		heads = make(map[string]struct{}, len(tax.Inference.GenericLegacyHeads))
 		for _, h := range tax.Inference.GenericLegacyHeads {
 			heads[Normalized(h)] = struct{}{}
 		}
@@ -541,6 +422,25 @@ func (r ResolvedRow) DeviceApplicationRiskAccessor() string {
 }
 func (r ResolvedRow) DeviceCategoryAccessor() string { return r.GetField(FieldDeviceCategory) }
 
+// requiredFieldsResolved reports whether every field the taxonomy marks
+// Required has a non-empty value in fields. If the taxonomy declares no
+// required fields, any non-empty resolution counts as a match.
+func requiredFieldsResolved(fields map[string]string, tax *Taxonomy) bool {
+	required := false
+	for _, f := range tax.Fields {
+		if f.Required {
+			required = true
+			if fields[f.Key] == "" {
+				return false
+			}
+		}
+	}
+	if !required {
+		return len(fields) > 0
+	}
+	return true
+}
+
 // ResolveRowNaming resolves names and taxonomy dimensions under default taxonomy.
 func ResolveRowNaming(row map[string]string) ResolvedRow {
 	return ResolveRowNamingFor(row, nil)
@@ -548,71 +448,50 @@ func ResolveRowNaming(row map[string]string) ResolvedRow {
 
 // ResolveRowNamingFor resolves names and taxonomy dimensions under the given taxonomy.
 func ResolveRowNamingFor(row map[string]string, tax *Taxonomy) ResolvedRow {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
 	legacySourceName := row["Legacy source name"]
 	sourceDeviceType := row["Source device type"]
 	emdnTerm := row["EMDN term"]
 
-	specificRule := InferSpecificNameRuleFor(legacySourceName, sourceDeviceType, emdnTerm, tax)
-	inferredType := ""
-	if specificRule != nil && specificRule.Type != "" {
-		inferredType = specificRule.Type
-	} else {
-		inferredType = InferDeviceTypeFor(legacySourceName, sourceDeviceType, emdnTerm, tax)
-	}
-	if inferredType == "" {
+	fields, ruleName, ruleCanonical, specific := ApplyRulesFor(legacySourceName, sourceDeviceType, emdnTerm, tax)
+
+	if !requiredFieldsResolved(fields, tax) {
 		return ResolvedRow{NamingSource: "unsupported_source_type"}
 	}
 
-	defaults := InferDefaultsFor(legacySourceName, sourceDeviceType, emdnTerm, inferredType, tax)
 	generatedCommon := InferCommonNameFromLegacyFor(legacySourceName, tax)
-	defaultCommon := defaults.CommonNameHint
-	defaultCanonical := defaults.CanonicalNameHint
 
-	namingSource := "family_fallback"
-	commonName := defaultCommon
-	if specificRule != nil && specificRule.CommonName != "" {
-		commonName = specificRule.CommonName
+	var commonName, namingSource string
+	switch {
+	case specific && ruleName != "":
+		commonName = ruleName
 		namingSource = "specific_rule"
-	} else if generatedCommon != "" {
+	case generatedCommon != "":
 		commonName = generatedCommon
 		namingSource = "legacy_derived"
+	case ruleName != "":
+		commonName = ruleName
+		namingSource = "family_fallback"
+	default:
+		namingSource = "family_fallback"
 	}
 
-	canonicalName := defaultCanonical
+	canonicalName := ruleCanonical
 	if canonicalName == "" {
-		canonicalName = commonName
-	}
-	if specificRule != nil && specificRule.CanonicalName != "" {
-		canonicalName = specificRule.CanonicalName
-	} else if namingSource == "specific_rule" || namingSource == "legacy_derived" {
 		canonicalName = commonName
 	}
 
 	commonName, canonicalName = RefineDescriptiveNamesFor(commonName, canonicalName, legacySourceName, emdnTerm, tax)
 
-	family := ""
-	if specificRule != nil && specificRule.Family != "" {
-		family = specificRule.Family
-	} else {
-		family = defaults.Family
-	}
-
-	category := CategoryForFunctionFor(defaults.Function, tax)
-	fields := map[string]string{
-		FieldDeviceType:            inferredType,
-		FieldDeviceCategory:        category,
-		FieldDeviceFamily:          family,
-		FieldDeviceFunction:        defaults.Function,
-		FieldDeviceApplicationRisk: defaults.Risk,
-	}
-
 	return ResolvedRow{
 		Fields:                fields,
-		DeviceType:            inferredType,
-		DeviceCategory:        category,
-		DeviceFamily:          family,
-		DeviceFunction:        defaults.Function,
-		DeviceApplicationRisk: defaults.Risk,
+		DeviceType:            fields[FieldDeviceType],
+		DeviceCategory:        fields[FieldDeviceCategory],
+		DeviceFamily:          fields[FieldDeviceFamily],
+		DeviceFunction:        fields[FieldDeviceFunction],
+		DeviceApplicationRisk: fields[FieldDeviceApplicationRisk],
 		Name:                  commonName,
 		CanonicalName:         canonicalName,
 		CommonNames:           BuildSearchAliasesFor(commonName, canonicalName, tax),

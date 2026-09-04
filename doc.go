@@ -1,28 +1,47 @@
-// Package ontology is a minimal system-agnostic device interchange ontology.
+// Package ontology is a system-agnostic device interchange and classification
+// engine. It executes vendor-defined vocabularies, taxonomies, and inference
+// rules. ontology does not own a vendor's vocabulary — each system supplies
+// its own taxonomy, and ontology acts purely as the engine that normalizes and
+// classifies device records against it.
 //
-// Any system can run its device records through this library and get back
-// the 4-field classification Ovahol needs for its device dictionary:
-// device_type, device_category, device_function (aka device_application),
-// and device_application_risk.
+// # What a vendor provides
+//
+// A vendor defines their controlled vocabulary and rules in their own codebase,
+// expressed as a Taxonomy (JSON). A Taxonomy is just two things: Fields, the
+// list of classification dimensions the vendor cares about (each with its own
+// key and controlled vocabulary — there's no fixed set of dimensions, and no
+// dimension name is special to the engine), and Inference.Rules, an ordered
+// list of keyword/source-type/field-dependency conditions that assign values
+// to those fields. Load it with LoadTaxonomyFile.
+//
+// If no taxonomy is supplied, ontology falls back to an embedded default
+// derived from the WHO's MeDevIS reference vocabulary (DefaultTaxonomy). This
+// default exists only so nil-taxonomy callers still produce useful,
+// standards-aligned output — it is not a vendor's vocabulary.
 //
 // # Quick start
 //
 //	import "github.com/ovahol/ontology"
 //
-//	result := ontology.Normalize(ontology.Input{
+//	tax, err := ontology.LoadTaxonomyFile("my_taxonomy.json")
+//	result := ontology.NormalizeWithTaxonomy(ontology.Input{
 //	    DeviceName: "ECG machine, portable, 12-lead",
 //	    SourceType: "monitoring equipment",
 //	    EMDNTerm:   "Electrocardiographs",
-//	})
-//	// result.Name                  -> "ECG machine"
-//	// result.DeviceType            -> "Monitoring & Measurement Devices"
-//	// result.DeviceCategory        -> "Diagnostic"
-//	// result.DeviceFunction        -> "Additional Physiological Monitoring and Diagnostic"
-//	// result.DeviceApplicationRisk -> "Inappropriate therapy or misdiagnosis"
+//	}, tax)
 //
-// For bulk imports from spreadsheets, use NormalizeWorkbook or NormalizeCSV:
+// Or build an Engine bound to a taxonomy and/or catalog:
 //
-//	results, err := ontology.NormalizeWorkbook("legacy_inventory.xlsx", "normalized.xlsx")
+//	engine := ontology.NewEngine(tax, ontology.WithCatalog(myCatalog))
+//	result := engine.Normalize(input)
+//
+// # Public entry points
+//
+//   - NormalizeWithTaxonomy / NormalizeBatchWithTaxonomy: single/batch records
+//   - NormalizeWithCatalogAndTaxonomy: catalog-first exact match, taxonomy fallback
+//   - NormalizeWorkbookWithTaxonomy / NormalizeCSVWithTaxonomy: file bulk import
+//   - NormalizeJSONWithTaxonomy: JSON arrays/objects
+//   - DefaultTaxonomy: the embedded WHO/MeDevIS reference vocabulary
 //
 // # Interchange schema
 //
@@ -40,27 +59,17 @@
 //
 //	{
 //	  "name": "Infusion pump",
-//	  "device_type": "Treatment, Surgical & Life Support Devices",
-//	  "device_category": "Therapeutic",
-//	  "device_function": "Surgical and Intensive Care",
-//	  "device_application_risk": "Potential patient or operator injury",
+//	  "fields": {
+//	    "device_type": "Treatment, Surgical & Life Support Devices",
+//	    "device_category": "Therapeutic",
+//	    "device_function": "Surgical and Intensive Care",
+//	    "device_application_risk": "Potential patient or operator injury"
+//	  },
 //	  "mapping_source": "family_fallback"
 //	}
 //
-// Output field names align with Ovahol's lookup tables
-// (device_type, device_category, device_function, device_application_risk)
-// so the same payload can be used for generic interchange or direct import.
-// device_application is an alias for device_function.
-//
-// # Controlled vocabulary
-//
-// Taxonomy is intentionally small and stable:
-//
-//   - 8 device types
-//   - 4 device categories (Therapeutic, Diagnostic, Analytical, Miscellaneous)
-//   - 9 device functions (each belongs to a category)
-//   - 5 application risks
-//
-// See taxonomy.go for the full lists. Every output value is drawn from
-// this vocabulary — no free-text leakage.
+// The controlled vocabulary (device_type, device_category, device_function,
+// device_application_risk, plus any vendor-defined fields via the Fields map)
+// is entirely determined by the vendor taxonomy. No free-text leaks into the
+// controlled fields.
 package ontology

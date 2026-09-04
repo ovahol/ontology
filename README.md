@@ -1,10 +1,8 @@
 # ontology
 
-**Ovahol Interchange Ontology** — a Go library that normalizes arbitrary device data from any healthcare system into Ovahol's controlled vocabulary.
+**ontology** is a Go engine for normalizing free-text device records into a controlled vocabulary. It ships no vocabulary of its own — every vendor (Ovahol, or anyone else) defines their own **Taxonomy**: the classification dimensions they care about and the rules that infer them from a device name, source type, and EMDN code/term. ontology just executes it.
 
-Any system hoping to migrate onto Ovahol (or exchange data with it) runs its device records through this library and gets back canonical Ovahol terminology: normalized name, device type, device category, device function, and application risk.
-
-This is the interchange schema: one vocabulary, any source.
+That's the whole design: **engine + data**. The taxonomy is JSON, authored and versioned in the vendor's own codebase, not vendored into this repo.
 
 ## Installation
 
@@ -19,96 +17,93 @@ Requires Go 1.27.0 or later.
 ```go
 import "github.com/ovahol/ontology"
 
-result := ontology.Normalize(ontology.Input{
+tax, err := ontology.LoadTaxonomyFile("my_taxonomy.json")
+
+result := ontology.NormalizeWithTaxonomy(ontology.Input{
     DeviceName: "ECG machine, portable, 12-lead",
     SourceType: "monitoring equipment",
     EMDNTerm:   "Electrocardiographs",
-})
-fmt.Println(result.Name)                  // ECG machine
-fmt.Println(result.DeviceType)            // Monitoring & Measurement Devices
-fmt.Println(result.DeviceCategory)        // Diagnostic
-fmt.Println(result.DeviceFunction)        // Additional Physiological Monitoring and Diagnostic
-fmt.Println(result.DeviceApplicationRisk) // Inappropriate therapy or misdiagnosis
-fmt.Println(result.Confidence)            // high
+}, tax)
+
+fmt.Println(result.Name)   // ECG machine
+fmt.Println(result.Fields) // map[device_type:... device_category:... device_function:... device_application_risk:...]
 ```
 
-Batch:
+Or bind a taxonomy (and optionally a catalog) to an `Engine` once, and reuse it:
 
 ```go
-results := ontology.NormalizeBatch([]ontology.Input{
-    {DeviceName: "Infusion pump, volumetric", SourceType: "infusion devices"},
-    {DeviceName: "Catheter, sterile, single-use, adult", SourceType: "catheters and related"},
-})
-
-apiRecords := ontology.ToAPIImportRecords(results) // deduplicated, API-ready
-csvBytes, _ := ontology.ToCSV(results)
-jsonBytes, _ := ontology.ToJSON(results)
+engine := ontology.NewEngine(tax, ontology.WithCatalog(myCatalog))
+result := engine.Normalize(input)
+results := engine.NormalizeBatch(inputs)
 ```
 
-## Interchange schema
+If you don't have a taxonomy yet, `ontology.Normalize(input)` (no taxonomy argument) falls back to an embedded neutral reference taxonomy derived from WHO's MeDevIS nomenclature — useful for getting started, not a substitute for your own vocabulary.
 
-The library defines a language-agnostic JSON interchange schema so non-Go systems can participate by producing/consuming JSON:
+## Taxonomy: your vocabulary, your rules
 
-**Input** (what any system sends):
+A `Taxonomy` is two things, and nothing else:
+
+- **`Fields`** — the classification dimensions you want out. Each field has a `key`, optional `allowed_values` (its controlled vocabulary), and whether it's `required`. There's no fixed set of dimensions and no dimension name means anything special to the engine — `device_type` is just a convention, not a keyword ontology recognizes.
+- **`Inference.Rules`** — an ordered list of rules. Each rule says: *if the input matches this (keywords, source type, or fields already resolved by an earlier rule), set these field values.* The first rule to set a given field wins; later rules only fill in what's still unset. That's how multi-stage inference works — no engine-level concept of "type then function then category," just rule order.
 
 ```json
 {
-  "device_name": "Infusion pump, volumetric",
-  "source_type": "infusion devices",
-  "emdn_code": "Z12010501",
-  "emdn_term": "Volumetric infusion pumps"
+  "id": "acme-devices",
+  "version": "1.0.0",
+  "fields": [
+    { "key": "device_type", "required": true, "allowed_values": ["Imaging", "Monitoring", "Surgical"] },
+    { "key": "risk_tier", "allowed_values": ["Low", "Medium", "High"] }
+  ],
+  "inference": {
+    "rules": [
+      { "keywords": ["ultrasound", "x-ray", "mri"], "set": { "device_type": "Imaging" } },
+      { "keywords": ["ecg", "patient monitor"], "set": { "device_type": "Monitoring" } },
+      { "requires": { "device_type": "Imaging" }, "set": { "risk_tier": "Medium" } }
+    ]
+  }
 }
 ```
 
-**Result** (what Ovahol expects):
+Load it with `ontology.LoadTaxonomyFile("acme.json")`. A vendor with two dimensions declares two; a vendor with eight declares eight — nothing here is Ovahol-shaped or MeDevIS-shaped. `Taxonomy.Validate()` checks it's well-formed (an id, a semver version, at least one required field with its vocabulary spelled out).
+
+Rules also support `source_types` (match against the normalized source type instead of/alongside keywords), `exclude_keywords`, and `name` / `canonical_name` (to assign the device's display name directly instead of deriving it from the legacy text). See [`taxonomy_version.go`](./taxonomy_version.go) for the full `Rule`/`FieldDef` shapes, and [`examples/taxonomies/ovahol.json`](./examples/taxonomies/ovahol.json) for a taxonomy with ~290 rules across 5 dimensions as a fully worked example.
+
+If none of a field's rules fire but the taxonomy declares `allowed_values` for it, the engine tries one more thing for free: matching the normalized source type directly against those allowed values. This is why the MeDevIS default taxonomy — which has zero rules — still classifies anything whose source type happens to already be one of its 39 device type names.
+
+## Result shape
+
+```go
+result.Name                  // normalized display name, e.g. "ECG machine"
+result.Fields                // map[string]string — every field the taxonomy resolved, keyed by field key
+result.MappingSource         // "specific_rule" | "legacy_derived" | "family_fallback" | "unsupported_source_type" | "catalog_exact"
+result.Confidence            // "high" | "medium" | "low" | "none"
+```
+
+`Result` also carries deprecated fixed accessors (`DeviceType`, `DeviceCategory`, `DeviceFunction`, `DeviceApplicationRisk`, `DeviceApplication`) that mirror `Fields["device_type"]` and friends — a convenience for the common case where your taxonomy happens to use those conventional keys, kept for callers who pinned an earlier version of this library before `Fields` existed. A taxonomy with different dimensions (like `risk_tier` above) simply won't populate them; read `result.Fields["risk_tier"]` instead.
 
 ```json
 {
   "name": "Infusion pump",
+  "fields": {
+    "device_type": "Treatment, Surgical & Life Support Devices",
+    "device_category": "Therapeutic",
+    "device_function": "Surgical and Intensive Care",
+    "device_application_risk": "Potential patient or operator injury"
+  },
   "device_type": "Treatment, Surgical & Life Support Devices",
   "device_category": "Therapeutic",
   "device_function": "Surgical and Intensive Care",
   "device_application_risk": "Potential patient or operator injury",
   "legacy_source_name": "Infusion pump, volumetric",
   "source_type": "infusion devices",
-  "emdn_code": "Z12010501",
-  "emdn_term": "Volumetric infusion pumps",
   "mapping_source": "family_fallback",
   "confidence": "medium"
 }
 ```
 
-`device_application` is also present as an alias of `device_function`, kept for callers using the older "device application" wording.
-
-All `device_type`, `device_category`, `device_function`, and `device_application_risk` values are drawn from a fixed controlled vocabulary — no free-text leakage.
-
-## Controlled vocabulary
-
-| Dimension | Count | Example values |
-|-----------|-------|----------------|
-| Device types | 8 | `Monitoring & Measurement Devices`, `Diagnostic & Imaging Devices`, `Treatment, Surgical & Life Support Devices`, ... |
-| Device categories | 4 | `Therapeutic`, `Diagnostic`, `Analytical`, `Miscellaneous` |
-| Device functions | 9 | `Life Support`, `Surgical and Intensive Care`, `Analytical Laboratory`, ... |
-| Application risks | 5 | `Potential patient death`, `Potential patient or operator injury`, `Inappropriate therapy or misdiagnosis`, ... |
-
-Internally the library also carries ~140 family grouping rules (used for name/family inference and in the workbook's audit sheets — see below) and 18 specific-name rules, but `Family` is not part of the public `Result`.
-
-See [`taxonomy.go`](./taxonomy.go) for the full lists and [`doc.go`](./doc.go) for package documentation.
-
-`MappingSource` explains how the common name was derived:
-
-| Value | Meaning |
-|-------|---------|
-| `specific_rule` | Matched a high-priority keyword rule (e.g. "oxygen concentrator") |
-| `legacy_derived` | Parsed directly from the legacy device name |
-| `family_fallback` | Fell back to the family default name |
-| `unsupported_source_type` | Source type not in `SupportedSourceTypes` — no mapping possible |
-
-`Confidence` is `high` / `medium` / `low` / `none`.
-
 ## Catalog (exact-match resolution)
 
-If the host system already has a device dictionary (e.g. Ovahol's `core_public.device`), pass it in as a `Catalog` so exact matches skip taxonomy inference entirely and return the dictionary's values verbatim:
+If the host system already has a device dictionary (e.g. Ovahol's `core_public.device`), pass it in as a `Catalog` so exact matches skip rule inference entirely and return the dictionary's values verbatim:
 
 ```go
 cat := ontology.NewInMemoryCatalog([]ontology.CatalogEntry{
@@ -121,11 +116,11 @@ cat := ontology.NewInMemoryCatalog([]ontology.CatalogEntry{
     },
 })
 
-result := ontology.NormalizeWithCatalog(ontology.Input{DeviceName: "ECG machine"}, cat)
+result := ontology.NormalizeWithCatalogAndTaxonomy(ontology.Input{DeviceName: "ECG machine"}, cat, tax)
 // result.MappingSource == "catalog_exact", result.Confidence == "high"
 ```
 
-Matching is by EMDN code, then device name, then EMDN term (all normalized/lowercased). A catalog miss falls back to ordinary taxonomy inference; a `nil` catalog always falls back. Implement `Catalog` yourself (e.g. backed by a single SQL lookup) to avoid vendoring the whole dictionary — see [`catalog.go`](./catalog.go) for the interface and a DB-backed example. `NormalizeBatchWithCatalog` is the batch analogue.
+Matching is by EMDN code, then device name, then EMDN term (all normalized/lowercased). A catalog miss falls back to ordinary taxonomy inference; a `nil` catalog always falls back. Implement `Catalog` yourself (e.g. backed by a single SQL lookup) to avoid vendoring the whole dictionary — see [`catalog.go`](./catalog.go) for the interface and a DB-backed example. `NormalizeBatchWithCatalogAndTaxonomy` is the batch analogue, and `Engine`/`WithCatalog` wraps both together.
 
 ## Workbook interchange (bulk migration)
 
@@ -133,44 +128,43 @@ For migrating a full inventory spreadsheet, use the workbook API. Any spreadshee
 
 ```go
 // Excel → normalized Excel + API CSV
-csvPath, err := ontology.NormalizeWorkbook("legacy_inventory.xlsx", "normalized.xlsx")
-fmt.Println(csvPath) // normalized.csv (next to the .xlsx)
-
-// Or at the record level
-records := ontology.NormalizeBatch(inputs)
-csvBytes, _ := ontology.ToCSV(records)
-apiRecords := ontology.ToAPIImportRecords(records)
+csvPath, err := ontology.NormalizeWorkbookWithTaxonomy("legacy_inventory.xlsx", "normalized.xlsx", tax)
+fmt.Println(csvPath) // <output>.api_import.csv, next to the .xlsx
 ```
 
 The output workbook mirrors the reference template:
 
 | Sheet | Contents |
 |-------|----------|
-| Devices | One row per device: name, type, category, function, risk, plus legacy source passthrough |
-| API Import | Deduplicated, API-ready rows (`name`, `device_type`, `device_category`, `device_function`, `device_application_risk`, `emdn_code`, `emdn_term`) |
-| Lookups | The 8 types, 4 categories, 9 functions, 5 risks (for Excel data validation) |
-| Naming Rules | How names should be formed |
-| Family Rules | All ~140 internal family grouping rules with match hints (used for inference, not exposed on `Result`) |
+| *(first sheet, original name preserved)* | One row per device: name, and the 4 conventional dimensions (type/category/function/risk) if the taxonomy declares them, plus legacy source passthrough |
+| API Import | Deduplicated, API-ready rows |
+| Lookups | One column per taxonomy field that declares `allowed_values` — however many dimensions the taxonomy has (used for Excel dropdown validation on the 4 conventional columns) |
+| Naming Rules | `Taxonomy.NamingRules`, if the vendor supplies any |
+| Inference Rules | The vendor's `Inference.Rules` list verbatim (keywords/source types/requires → sets), for audit |
 | Common Name Mapping Review | Legacy → mapped name audit trail |
-| Family Naming Review | Per-family consistency check |
-| Family Naming Audit | Detailed per-family audit |
+| Family Naming Review / Audit | Per-`device_family` consistency check, when the taxonomy uses that conventional key |
 
 Column headers are flexible on input — the library tolerates `Device name`, `name`, `common_name`, `device_type`, `emdn_code`, `Nomenclature code (EMDN)`, etc.
+
+`NormalizeWorkbook`/`NormalizeCSV` (no taxonomy argument) fall back to the embedded default taxonomy, same as `Normalize`.
 
 ## CLI
 
 ```bash
 go install github.com/ovahol/ontology/cmd/ontology@latest
 
-ontology legacy.xlsx normalized.xlsx
+ontology --taxonomy my_taxonomy.json legacy.xlsx normalized.xlsx
 # normalized workbook written to normalized.xlsx
-# api import csv written to normalized.csv
+# api import csv written to normalized.xlsx.api_import.csv
 ```
+
+Omit `--taxonomy`/`--taxonomy-dir` to use the embedded WHO/MeDevIS default.
 
 ## What's not in here
 
 This library normalizes **vocabulary** — it does not:
 
+- Own any vendor's vocabulary. Ovahol's, MeDevIS's, and any other taxonomy under `examples/taxonomies/` are examples/fixtures for this repo's own tests, not vocabulary this library ships as *the* vocabulary.
 - Resolve foreign keys (model IDs, location IDs, status IDs) — those are facility-specific and resolved by the importer after normalization.
 - Validate business rules (e.g. "is this device allowed at this facility?") — that's the application's job.
 - Handle non-device entities (work orders, training sessions, etc.) — use `facilityimport` in the Ovahol monorepo for the full facility lifecycle import.

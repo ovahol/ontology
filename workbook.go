@@ -14,8 +14,8 @@ import (
 // styleHeader applies the header style (1F4B99, white bold, centered).
 func styleHeader(f *excelize.File, sheet, cell string) error {
 	style, err := f.NewStyle(&excelize.Style{
-		Font: &excelize.Font{Bold: true, Color: "FFFFFF", Size: 10},
-		Fill: excelize.Fill{Type: "pattern", Color: []string{"1F4B99"}, Pattern: 1},
+		Font:      &excelize.Font{Bold: true, Color: "FFFFFF", Size: 10},
+		Fill:      excelize.Fill{Type: "pattern", Color: []string{"1F4B99"}, Pattern: 1},
 		Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true},
 		Border: []excelize.Border{
 			{Type: "left", Color: "D9D9D9", Style: 1},
@@ -80,17 +80,17 @@ func extractDeviceRows(f *excelize.File, sheetName string) ([]map[string]string,
 		}
 		// Also allow "Device name" / "name" etc. — support both new agnostic and legacy Ovahol headers for backward compat
 		m := map[string]string{
-			"Name":                  get("Name", "Common name", "common_name"),
-			"Canonical device name": get("Canonical device name", "canonical_device_name"),
-			"Common names":          get("Common names", "Search aliases", "search_aliases", "common_names"),
-			"Device type":           get("Device type", "device_type", "Ovahol device type", "ovahol_device_type"),
-			"Device family":         get("Device family", "device_family", "Ovahol device family", "ovahol_device_family"),
-			"Device function":       get("Device function", "device_function"),
+			"Name":                    get("Name", "Common name", "common_name"),
+			"Canonical device name":   get("Canonical device name", "canonical_device_name"),
+			"Common names":            get("Common names", "Search aliases", "search_aliases", "common_names"),
+			"Device type":             get("Device type", "device_type", "Ovahol device type", "ovahol_device_type"),
+			"Device family":           get("Device family", "device_family", "Ovahol device family", "ovahol_device_family"),
+			"Device function":         get("Device function", "device_function"),
 			"Device application risk": get("Device application risk", "device_application_risk"),
-			"Legacy source name":    get("Legacy source name", "Device name", "name", "legacy_source_name"),
-			"Source device type":    get("Source device type", "source_type"),
-			"EMDN code":             get("EMDN code", "emdn_code", emdnCodeKey),
-			"EMDN term":             get("EMDN term", "emdn_term", emdnTermKey),
+			"Legacy source name":      get("Legacy source name", "Device name", "name", "legacy_source_name"),
+			"Source device type":      get("Source device type", "source_type"),
+			"EMDN code":               get("EMDN code", "emdn_code", emdnCodeKey),
+			"EMDN term":               get("EMDN term", "emdn_term", emdnTermKey),
 		}
 		// skip entirely empty rows
 		empty := true
@@ -132,7 +132,7 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 		// If MoveSheet not available, we just keep creation order; not critical.
 	}
 
-	for colIdx, header := range DeviceSheetHeaders {
+	for colIdx, header := range DefaultDeviceSheetHeaders {
 		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
 		f.SetCellValue(sheetName, cell, header)
 		styleHeader(f, sheetName, cell)
@@ -180,7 +180,7 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy)
 		return err
 	}
 	_ = newIdx
-	for colIdx, header := range APIImportHeaders {
+	for colIdx, header := range DefaultAPIImportHeaders {
 		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
 		f.SetCellValue(sheet, cell, header)
 		styleHeader(f, sheet, cell)
@@ -265,7 +265,12 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy)
 	return nil
 }
 
-func rebuildLookupsSheet(f *excelize.File, tax *Taxonomy) error {
+// rebuildLookupsSheet writes one column per taxonomy field that declares
+// AllowedValues, in Fields order — however many dimensions the vendor's
+// taxonomy has. It returns the column letter used for each field key so
+// applyValidations can wire up dropdowns for the fields the Devices sheet
+// has dedicated columns for.
+func rebuildLookupsSheet(f *excelize.File, tax *Taxonomy) (map[string]string, error) {
 	sheet := "Lookups"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -273,46 +278,30 @@ func rebuildLookupsSheet(f *excelize.File, tax *Taxonomy) error {
 	}
 	newIdx, err := f.NewSheet(sheet)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	_ = newIdx
-	headers := []struct{ Cell, Value string }{
-		{"A1", "Device types"},
-		{"C1", "Device categories"},
-		{"E1", "Device functions"},
-		{"H1", "Device application risks"},
+	colFor := make(map[string]string)
+	col := 1
+	for _, fd := range tax.Fields {
+		if len(fd.AllowedValues) == 0 {
+			continue
+		}
+		letter := colLetter(col)
+		header := fd.Label
+		if header == "" {
+			header = fd.Key
+		}
+		f.SetCellValue(sheet, letter+"1", header)
+		styleHeader(f, sheet, letter+"1")
+		for i, v := range fd.AllowedValues {
+			f.SetCellValue(sheet, fmt.Sprintf("%s%d", letter, i+2), v)
+		}
+		f.SetColWidth(sheet, letter, letter, 44)
+		colFor[fd.Key] = letter
+		col++
 	}
-	for _, h := range headers {
-		f.SetCellValue(sheet, h.Cell, h.Value)
-		styleHeader(f, sheet, h.Cell)
-	}
-	for i, dt := range DeviceTypes {
-		f.SetCellValue(sheet, fmt.Sprintf("A%d", i+2), dt.Name)
-		f.SetCellValue(sheet, fmt.Sprintf("B%d", i+2), dt.Code)
-	}
-	for i, dc := range DeviceCategories {
-		f.SetCellValue(sheet, fmt.Sprintf("C%d", i+2), dc.Name)
-		f.SetCellValue(sheet, fmt.Sprintf("D%d", i+2), dc.Code)
-	}
-	for i, fn := range DeviceFunctions {
-		f.SetCellValue(sheet, fmt.Sprintf("E%d", i+2), fn.Name)
-		f.SetCellValue(sheet, fmt.Sprintf("F%d", i+2), fn.Code)
-		f.SetCellValue(sheet, fmt.Sprintf("G%d", i+2), fn.Category)
-	}
-	for i, r := range DeviceApplicationRisks {
-		f.SetCellValue(sheet, fmt.Sprintf("H%d", i+2), r.Description)
-		f.SetCellValue(sheet, fmt.Sprintf("I%d", i+2), r.ScorePoint)
-	}
-	f.SetColWidth(sheet, "A", "A", 44)
-	f.SetColWidth(sheet, "B", "B", 40)
-	f.SetColWidth(sheet, "C", "C", 24)
-	f.SetColWidth(sheet, "D", "D", 24)
-	f.SetColWidth(sheet, "E", "E", 44)
-	f.SetColWidth(sheet, "F", "F", 32)
-	f.SetColWidth(sheet, "G", "G", 24)
-	f.SetColWidth(sheet, "H", "H", 42)
-	f.SetColWidth(sheet, "I", "I", 12)
-	return nil
+	return colFor, nil
 }
 
 func rebuildNamingRulesSheet(f *excelize.File, tax *Taxonomy) error {
@@ -332,15 +321,15 @@ func rebuildNamingRulesSheet(f *excelize.File, tax *Taxonomy) error {
 		f.SetCellValue(sheet, cell, h)
 		styleHeader(f, sheet, cell)
 	}
-	for i, r := range NamingRules {
+	for i, r := range tax.NamingRules {
 		setCell(f, sheet, i+2, 1, r.Field)
 		setCell(f, sheet, i+2, 2, r.Rule)
 		setCell(f, sheet, i+2, 3, r.GoodExample)
 		setCell(f, sheet, i+2, 4, r.Avoid)
 	}
 	f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	if len(NamingRules) > 0 {
-		f.AutoFilter(sheet, fmt.Sprintf("A1:D%d", len(NamingRules)+1), nil)
+	if len(tax.NamingRules) > 0 {
+		f.AutoFilter(sheet, fmt.Sprintf("A1:D%d", len(tax.NamingRules)+1), nil)
 	}
 	f.SetColWidth(sheet, "A", "A", 20)
 	f.SetColWidth(sheet, "B", "B", 72)
@@ -349,8 +338,12 @@ func rebuildNamingRulesSheet(f *excelize.File, tax *Taxonomy) error {
 	return nil
 }
 
-func rebuildFamilyRulesSheet(f *excelize.File, tax *Taxonomy) error {
-	sheet := "Family Rules"
+// rebuildInferenceRulesSheet dumps the vendor's ordered rule list verbatim —
+// Keywords/SourceTypes/Requires (when the rule matches) and Set/Name (what it
+// assigns) — as a debug/audit view. Unlike the old Ovahol-specific "Family
+// Rules" sheet, this makes no assumption about which fields a rule sets.
+func rebuildInferenceRulesSheet(f *excelize.File, tax *Taxonomy) error {
+	sheet := "Inference Rules"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
 		f.DeleteSheet(sheet)
@@ -360,35 +353,47 @@ func rebuildFamilyRulesSheet(f *excelize.File, tax *Taxonomy) error {
 		return err
 	}
 	_ = newIdx
-	headers := []string{"Device type", "Device family", "Suggested name", "Suggested canonical name", "Default device function", "Default application risk", "Match hints"}
+	headers := []string{"When: keywords", "When: source types", "When: requires", "Sets", "Name", "Canonical name"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
 		styleHeader(f, sheet, cell)
 	}
-	for i, r := range FamilyRules {
-		hints := []string{}
-		if len(r.SourceTypes) > 0 {
-			sort.Strings(r.SourceTypes)
-			hints = append(hints, "source: "+strings.Join(r.SourceTypes, ", "))
+	var rules []Rule
+	if tax.Inference != nil {
+		rules = tax.Inference.Rules
+	}
+	for i, r := range rules {
+		requires := make([]string, 0, len(r.Requires))
+		for k, v := range r.Requires {
+			requires = append(requires, k+"="+v)
 		}
-		if len(r.Keywords) > 0 {
-			hints = append(hints, "keywords: "+strings.Join(r.Keywords, ", "))
+		sort.Strings(requires)
+		sets := make([]string, 0, len(r.Set))
+		for k, v := range r.Set {
+			sets = append(sets, k+"="+v)
 		}
-		values := []string{r.Type, r.Family, r.CommonName, r.CanonicalName, r.Function, r.Risk, strings.Join(hints, " | ")}
+		sort.Strings(sets)
+		values := []string{
+			strings.Join(r.Keywords, ", "),
+			strings.Join(r.SourceTypes, ", "),
+			strings.Join(requires, ", "),
+			strings.Join(sets, ", "),
+			r.Name,
+			r.CanonicalName,
+		}
 		for colIdx, v := range values {
 			setCell(f, sheet, i+2, colIdx+1, v)
 		}
 	}
 	f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	f.AutoFilter(sheet, fmt.Sprintf("A1:G%d", len(FamilyRules)+1), nil)
-	f.SetColWidth(sheet, "A", "A", 34)
+	f.AutoFilter(sheet, fmt.Sprintf("A1:F%d", len(rules)+1), nil)
+	f.SetColWidth(sheet, "A", "A", 60)
 	f.SetColWidth(sheet, "B", "B", 34)
-	f.SetColWidth(sheet, "C", "C", 28)
-	f.SetColWidth(sheet, "D", "D", 42)
+	f.SetColWidth(sheet, "C", "C", 34)
+	f.SetColWidth(sheet, "D", "D", 60)
 	f.SetColWidth(sheet, "E", "E", 34)
-	f.SetColWidth(sheet, "F", "F", 34)
-	f.SetColWidth(sheet, "G", "G", 72)
+	f.SetColWidth(sheet, "F", "F", 42)
 	return nil
 }
 
@@ -489,12 +494,12 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 		headerMap[h] = i
 	}
 	type agg struct {
-		count    int
-		common   map[string]bool
+		count     int
+		common    map[string]bool
 		canonical map[string]bool
-		aliases  map[string]bool
-		sources  map[string]bool
-		legacy   []string
+		aliases   map[string]bool
+		sources   map[string]bool
+		legacy    []string
 		legacySet map[string]bool
 	}
 	grouped := map[string]*agg{}
@@ -535,11 +540,11 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 		}
 	}
 	type rowData struct {
-		Type, Family string
-		Count int
-		Status, CommonStd, CanonicalStd, AliasStd string
+		Type, Family                                     string
+		Count                                            int
+		Status, CommonStd, CanonicalStd, AliasStd        string
 		DistinctCommon, DistinctCanonical, DistinctAlias int
-		Sources, Sample string
+		Sources, Sample                                  string
 	}
 	var outRows []rowData
 	for k, a := range grouped {
@@ -685,23 +690,29 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 	return nil
 }
 
-func applyValidations(f *excelize.File, sheet string, maxRow int, tax *Taxonomy) error {
-	typeEnd := 1 + len(DeviceTypes)
-	categoryEnd := 1 + len(DeviceCategories)
-	funcEnd := 1 + len(DeviceFunctions)
-	riskEnd := 1 + len(DeviceApplicationRisks)
-	validations := []struct {
-		SqRef, Formula string
-	}{
-		{fmt.Sprintf("B2:B%d", maxRow), fmt.Sprintf("Lookups!$A$2:$A$%d", typeEnd)},
-		{fmt.Sprintf("C2:C%d", maxRow), fmt.Sprintf("Lookups!$C$2:$C$%d", categoryEnd)},
-		{fmt.Sprintf("D2:D%d", maxRow), fmt.Sprintf("Lookups!$E$2:$E$%d", funcEnd)},
-		{fmt.Sprintf("E2:E%d", maxRow), fmt.Sprintf("Lookups!$H$2:$H$%d", riskEnd)},
+// applyValidations wires an Excel dropdown for each of the Devices sheet's 4
+// conventional columns (B–E) to its Lookups column, for whichever of those
+// fields the taxonomy actually declares allowed values for — a taxonomy
+// missing one (or all) of them just doesn't get a dropdown there.
+func applyValidations(f *excelize.File, sheet string, maxRow int, tax *Taxonomy, lookupCol map[string]string) error {
+	devicesCol := map[string]string{
+		FieldDeviceType:            "B",
+		FieldDeviceCategory:        "C",
+		FieldDeviceFunction:        "D",
+		FieldDeviceApplicationRisk: "E",
 	}
-	for _, v := range validations {
+	for key, dCol := range devicesCol {
+		lCol, ok := lookupCol[key]
+		if !ok {
+			continue
+		}
+		fd := tax.Field(key)
+		if fd == nil || len(fd.AllowedValues) == 0 {
+			continue
+		}
 		dv := excelize.NewDataValidation(true)
-		dv.SetSqref(v.SqRef)
-		dv.SetSqrefDropList(v.Formula)
+		dv.SetSqref(fmt.Sprintf("%s2:%s%d", dCol, dCol, maxRow))
+		dv.SetSqrefDropList(fmt.Sprintf("Lookups!$%s$2:$%s$%d", lCol, lCol, len(fd.AllowedValues)+1))
 		f.AddDataValidation(sheet, dv)
 	}
 	return nil
@@ -726,7 +737,7 @@ func writeAPIImportCSV(f *excelize.File, devicesSheet, outputPath string, tax *T
 	}
 	defer file.Close()
 	w := csv.NewWriter(file)
-	w.Write(APIImportHeaders)
+	w.Write(DefaultAPIImportHeaders)
 	seen := map[string]bool{}
 	for _, row := range rows[1:] {
 		get := func(key string) string {
@@ -789,10 +800,11 @@ func NormalizeWorkbookAs(inputPath, outputPath string, tax interface{}) (string,
 
 // NormalizeWorkbookWithTaxonomy normalizes a workbook with the given vendor taxonomy.
 func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) (string, error) {
-	if tax != nil {
-		if err := tax.Validate(); err != nil {
-			return "", err
-		}
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	if err := tax.Validate(); err != nil {
+		return "", err
 	}
 	f, err := excelize.OpenFile(inputPath)
 	if err != nil {
@@ -815,13 +827,14 @@ func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) 
 	if err := rebuildAPIImportSheet(f, devicesSheet, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildLookupsSheet(f, tax); err != nil {
+	lookupCol, err := rebuildLookupsSheet(f, tax)
+	if err != nil {
 		return "", err
 	}
 	if err := rebuildNamingRulesSheet(f, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildFamilyRulesSheet(f, tax); err != nil {
+	if err := rebuildInferenceRulesSheet(f, tax); err != nil {
 		return "", err
 	}
 	if err := rebuildCommonNameMappingReviewSheet(f, devicesSheet, tax); err != nil {
@@ -839,7 +852,7 @@ func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) 
 	if maxRow < 2 {
 		maxRow = 2
 	}
-	if err := applyValidations(f, devicesSheet, maxRow, tax); err != nil {
+	if err := applyValidations(f, devicesSheet, maxRow, tax, lookupCol); err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {

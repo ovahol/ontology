@@ -9,25 +9,30 @@ import (
 )
 
 func main() {
+	// ontology is an engine: it needs a vendor taxonomy. Here we load an
+	// example vendor taxonomy (Ovahol). Vendors ship their own taxonomy in
+	// their own codebase and load it with LoadTaxonomyFile.
+	tax, err := ontology.LoadTaxonomyFile("examples/taxonomies/medevis.json")
+	if err != nil {
+		log.Fatalf("load taxonomy: %v", err)
+	}
+
 	// Example 1: single device normalization
 	fmt.Println("=== Single device ===")
-	result := ontology.Normalize(ontology.Input{
-		DeviceName: "ECG machine, portable, 12-lead",
-		SourceType: "monitoring equipment",
-		EMDNTerm:   "Electrocardiographs",
-	})
+	result := ontology.NormalizeWithTaxonomy(ontology.Input{
+		DeviceName: "Patient monitor, multiparameter",
+		SourceType: "Monitoring equipment",
+	}, tax)
 	printResult(result)
 
 	// Example 2: batch from JSON (simulating interchange from another system)
-	fmt.Println("\n=== Batch from JSON ===")
+	fmt.Println("\n=== Batch from JSON (WHO/Medevis default vocabulary) ===")
 	jsonData := `[
-		{"device_name": "Infusion pump, volumetric", "source_type": "infusion devices", "emdn_term": "Volumetric infusion pumps"},
-		{"device_name": "Catheter, sterile, single-use, adult", "source_type": "catheters and related", "emdn_term": "Peripheral venous catheters"},
-		{"device_name": "Chemistry analyzer", "source_type": "laboratory equipment"},
-		{"device_name": "Oxygen concentrator, 5L", "source_type": "medical gas equipment"},
-		{"device_name": "Autoclave, benchtop", "source_type": "cleaning disinfection sterilization equipment"}
+		{"device_name": "Linear accelerator system", "source_type": "Radiotherapy-related equipment"},
+		{"device_name": "Infusion pump, volumetric", "source_type": "Infusion devices"},
+		{"device_name": "In vitro diagnostic rapid test kit", "source_type": "In vitro diagnostic tests"}
 	]`
-	results, err := ontology.NormalizeJSON([]byte(jsonData))
+	results, err := ontology.NormalizeJSONWithTaxonomy([]byte(jsonData), tax)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,24 +54,14 @@ func main() {
 	for _, l := range lines {
 		fmt.Println(l)
 	}
-
-	// Example 5: confidence and validation
-	fmt.Println("\n=== Validation ===")
-	invalid := ontology.Normalize(ontology.Input{
-		DeviceName: "Something",
-		SourceType: "unknown category xyz",
-	})
-	fmt.Printf("Unsupported source: valid=%v confidence=%s mapping_source=%s\n",
-		invalid.IsValid(), invalid.Confidence, invalid.MappingSource)
 }
 
 func printResult(r ontology.Result) {
 	fmt.Printf("  Input:    %q (%s)\n", r.LegacySourceName, r.SourceType)
 	fmt.Printf("  Name:     %s\n", r.Name)
-	fmt.Printf("  Type:     %s\n", r.DeviceType)
-	fmt.Printf("  Category: %s\n", r.DeviceCategory)
-	fmt.Printf("  Function: %s\n", r.DeviceFunction)
-	fmt.Printf("  Risk:     %s\n", r.DeviceApplicationRisk)
+	for k, v := range r.Fields {
+		fmt.Printf("  %s: %s\n", k, v)
+	}
 	fmt.Printf("  Source:   %s (confidence: %s)\n", r.MappingSource, r.Confidence)
 }
 

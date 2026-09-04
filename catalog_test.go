@@ -37,11 +37,15 @@ func TestCatalogExactMatch(t *testing.T) {
 }
 
 func TestCatalogFallback(t *testing.T) {
+	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	if err != nil {
+		t.Fatalf("load taxonomy: %v", err)
+	}
 	cat := NewInMemoryCatalog([]CatalogEntry{
 		{Name: "Known Device", DeviceType: "Support Equipment & Furniture", DeviceFunction: "Patient Related and Other", DeviceApplicationRisk: "Equipment damage"},
 	})
 	// miss → fallback to taxonomy
-	r := NormalizeWithCatalog(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"}, cat)
+	r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"}, cat, tax)
 	if r.MappingSource == "catalog_exact" {
 		t.Fatalf("expected taxonomy fallback, got catalog_exact")
 	}
@@ -49,7 +53,7 @@ func TestCatalogFallback(t *testing.T) {
 		t.Errorf("fallback inference wrong: %+v", r)
 	}
 	// nil catalog → always taxonomy
-	rNil := NormalizeWithCatalog(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, nil)
+	rNil := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, nil, tax)
 	if rNil.MappingSource == "catalog_exact" {
 		t.Error("nil catalog should not return catalog_exact")
 	}

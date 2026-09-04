@@ -2,6 +2,10 @@ package ontology
 
 import "testing"
 
+// ovaholTax loads Ovahol's taxonomy from its example file. Ovahol's vocabulary
+// is no longer the built-in default — it lives in examples/taxonomies/ovahol.json
+// for use/testing only.
+
 func TestNormalize(t *testing.T) {
 	tests := []struct {
 		name string
@@ -39,9 +43,13 @@ func TestNormalize(t *testing.T) {
 			want: "Medical Gas & Respiratory Devices",
 		},
 	}
+	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	if err != nil {
+		t.Fatalf("load ovahol taxonomy: %v", err)
+	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := Normalize(tc.in)
+			result := NormalizeWithTaxonomy(tc.in, tax)
 			if result.DeviceType != tc.want {
 				t.Errorf("Normalize(%+v) DeviceType = %q, want %q (full result: %+v)", tc.in, result.DeviceType, tc.want, result)
 			}
@@ -55,31 +63,62 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
+func TestNormalizeWithMedevisDefault(t *testing.T) {
+	// When no taxonomy is supplied, the engine uses the WHO/Medevis default.
+	tests := []struct {
+		name string
+		in   Input
+		want string
+	}{
+		{
+			name: "radiotherapy source type maps to itself",
+			in:   Input{DeviceName: "Linear accelerator system", SourceType: "Radiotherapy-related equipment"},
+			want: "Radiotherapy-related equipment",
+		},
+		{
+			name: "monitoring equipment source type",
+			in:   Input{DeviceName: "Patient monitor", SourceType: "monitoring equipment"},
+			want: "Monitoring equipment",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			result := Normalize(tc.in)
+			if result.DeviceType != tc.want {
+				t.Errorf("Normalize(%+v) DeviceType = %q, want %q", tc.in, result.DeviceType, tc.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeConfidence(t *testing.T) {
-	r := Normalize(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"})
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	r := NormalizeWithTaxonomy(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, tax)
 	if r.Confidence == "none" {
 		t.Errorf("expected non-none confidence for valid input, got %q", r.Confidence)
 	}
-	r2 := Normalize(Input{DeviceName: "Widget", SourceType: "unknown xyz"})
+	r2 := NormalizeWithTaxonomy(Input{DeviceName: "Widget", SourceType: "unknown xyz"}, tax)
 	if r2.Confidence != "none" {
 		t.Errorf("expected none confidence for unsupported, got %q", r2.Confidence)
 	}
 }
 
 func TestNormalizeBatch(t *testing.T) {
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
 	inputs := []Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 		{DeviceName: "Infusion pump", SourceType: "infusion devices"},
 	}
-	results := NormalizeBatch(inputs)
+	results := NormalizeBatchWithTaxonomy(inputs, tax)
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
 	}
 }
 
 func TestNormalizeJSON(t *testing.T) {
-	data := `[{"device_name":"ECG machine","source_type":"monitoring equipment"}]`
-	results, err := NormalizeJSON([]byte(data))
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	data := []byte(`[{"device_name":"ECG machine","source_type":"monitoring equipment"}]`)
+	results, err := NormalizeJSONWithTaxonomy(data, tax)
 	if err != nil {
 		t.Fatalf("NormalizeJSON: %v", err)
 	}
@@ -92,12 +131,13 @@ func TestNormalizeJSON(t *testing.T) {
 }
 
 func TestToAPIImportRecords(t *testing.T) {
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
 	inputs := []Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, // duplicate
 		{DeviceName: "Infusion pump", SourceType: "infusion devices"},
 	}
-	results := NormalizeBatch(inputs)
+	results := NormalizeBatchWithTaxonomy(inputs, tax)
 	apiRecords := ToAPIImportRecords(results)
 	// Two unique combinations (ECG and infusion pump)
 	if len(apiRecords) != 2 {
@@ -106,9 +146,10 @@ func TestToAPIImportRecords(t *testing.T) {
 }
 
 func TestToCSV(t *testing.T) {
-	results := NormalizeBatch([]Input{
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	results := NormalizeBatchWithTaxonomy([]Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
-	})
+	}, tax)
 	data, err := ToCSV(results)
 	if err != nil {
 		t.Fatalf("ToCSV: %v", err)
@@ -118,15 +159,17 @@ func TestToCSV(t *testing.T) {
 	}
 }
 
-func TestLookupVocabulary(t *testing.T) {
-	if len(DeviceTypes) != 8 {
-		t.Errorf("expected 8 device types, got %d", len(DeviceTypes))
+func TestDefaultTaxonomyIsMedevis(t *testing.T) {
+	tax := DefaultTaxonomy()
+	if tax == nil {
+		t.Fatal("expected non-nil default taxonomy")
 	}
-	if len(DeviceFunctions) != 9 {
-		t.Errorf("expected 9 device functions, got %d", len(DeviceFunctions))
+	if tax.ID != "medevis" {
+		t.Errorf("expected default taxonomy id 'medevis', got %q", tax.ID)
 	}
-	if len(DeviceApplicationRisks) != 5 {
-		t.Errorf("expected 5 risks, got %d", len(DeviceApplicationRisks))
+	fd := tax.Field(FieldDeviceType)
+	if fd == nil || len(fd.AllowedValues) != 39 {
+		t.Errorf("expected 39 medevis device types, got %d", len(fd.AllowedValues))
 	}
 }
 
@@ -140,7 +183,8 @@ func TestValidateInput(t *testing.T) {
 }
 
 func TestAgnosticJSONFields(t *testing.T) {
-	r := Normalize(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"})
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	r := NormalizeWithTaxonomy(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, tax)
 	if r.Name == "" {
 		t.Error("expected non-empty Name")
 	}
@@ -181,7 +225,8 @@ func TestAgnosticJSONFields(t *testing.T) {
 }
 
 func TestStreamlinedFields(t *testing.T) {
-	r := Normalize(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"})
+	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	r := NormalizeWithTaxonomy(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"}, tax)
 	if r.DeviceType != "Treatment, Surgical & Life Support Devices" {
 		t.Errorf("unexpected DeviceType: %q", r.DeviceType)
 	}

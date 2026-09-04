@@ -40,6 +40,10 @@ func TestEngineWithMedevisTaxonomy(t *testing.T) {
 	}
 }
 
+// TestEngineWithCustomVendorRules exercises a vendor whose taxonomy has a
+// dimension ontology has never heard of ("device_tier") and no device_type
+// at all. That's the point: nothing in the engine special-cases field names,
+// so a vendor's own shape works exactly like Ovahol's or MeDevIS's.
 func TestEngineWithCustomVendorRules(t *testing.T) {
 	customTax := &Taxonomy{
 		ID:            "vendor-alpha",
@@ -55,17 +59,12 @@ func TestEngineWithCustomVendorRules(t *testing.T) {
 			},
 		},
 		Inference: &InferenceRules{
-			TypeByKeyword: []struct {
-				Keywords []string `json:"keywords"`
-				Type     string   `json:"type"`
-			}{
+			Rules: []Rule{
 				{
-					Keywords: []string{"cryo pump", "cryo-cooler"},
-					Type:     "Cryogenic Systems",
+					Keywords:    []string{"cryo pump", "cryo-cooler"},
+					SourceTypes: []string{"cryo devices"},
+					Set:         map[string]string{"device_tier": "Tier 1 - Critical"},
 				},
-			},
-			SourceTypeMap: map[string]string{
-				"cryo devices": "Cryogenic Systems",
 			},
 			LegacyDescriptorPhrases: []string{"ultra-low", "50k"},
 			Acronyms:                []string{"cryo", "mri"},
@@ -97,8 +96,11 @@ func TestEngineWithCustomVendorRules(t *testing.T) {
 		SourceType: "cryo devices",
 	})
 
-	if res.DeviceType != "Cryogenic Systems" {
-		t.Errorf("expected DeviceType 'Cryogenic Systems', got %q", res.DeviceType)
+	if res.DeviceType != "" {
+		t.Errorf("vendor declares no device_type field; expected empty deprecated DeviceType accessor, got %q", res.DeviceType)
+	}
+	if res.Fields["device_tier"] != "Tier 1 - Critical" {
+		t.Errorf("expected Fields[device_tier] = 'Tier 1 - Critical', got %q (fields: %+v)", res.Fields["device_tier"], res.Fields)
 	}
 	if res.Name != "Ultra-low Cryo Pump" {
 		t.Errorf("expected refined common name 'Ultra-low Cryo Pump', got %q", res.Name)
@@ -115,6 +117,9 @@ func TestEngineWithCustomVendorRules(t *testing.T) {
 	}
 	if resolved.CanonicalName != "Ultra-low Temperature Cryogenic Pump" {
 		t.Errorf("expected resolved CanonicalName 'Ultra-low Temperature Cryogenic Pump', got %q", resolved.CanonicalName)
+	}
+	if resolved.Fields["device_tier"] != "Tier 1 - Critical" {
+		t.Errorf("expected resolved Fields[device_tier] = 'Tier 1 - Critical', got %q", resolved.Fields["device_tier"])
 	}
 
 	hasAlias := false
