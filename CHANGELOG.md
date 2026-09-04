@@ -34,6 +34,21 @@ vendor's vocabulary. All placeholders and the status set are vendor-supplied.
 - `examples/ovahol/conventions.go` removed (its Ovahol-specific
   `ApplyUnknownConventions`/`MigrationRecord` moved into the configured engine).
 
+### Removed — vendored Ovahol artifacts
+
+The library no longer carries any Ovahol-specific vocabulary. The blank-slate
+principle ("no vendor vocabulary in the library") now extends to fixtures too.
+
+- `cmd/gen-ovahol-taxonomy` (generator + `curated.json`) — removed; Ovahol's
+  taxonomy is Ovahol's artifact, generated wherever Ovahol's app lives.
+- `examples/taxonomies/ovahol.json` — removed. Tests no longer depend on a
+  vendored Ovahol vocabulary: they exercise the engine against a neutral,
+  synthetic fixture at `testdata/fixture.json` (same 4-dimension shape, generic
+  values). `TestDictionaryReconciliation` now uses an inline hermetic dictionary
+  instead of the gitignored, local `devices.csv`.
+- `examples/ovahol` (the "how Ovahol consumes the API" demo) reads the taxonomy
+  from `$OVAHOL_TAXONOMY` (external to this library) instead of shipping a copy.
+
 ### Removed — deprecated Ovahol mirror code
 
 The engine previously carried deprecated fixed fields that mirrored the pluggable
@@ -118,7 +133,9 @@ domain into Ovahol's dimensions to participate. That's fixed now:
   WHO's MeDevIS nomenclature, used only when no taxonomy is supplied
   (`Normalize`, `NormalizeWorkbook`, etc. without a taxonomy argument now mean
   "use the default," not "use Ovahol's vocabulary"). Ovahol's own vocabulary
-  moved to `examples/taxonomies/ovahol.json`, used only by this repo's tests.
+  was moved to `examples/taxonomies/ovahol.json`, used only by this repo's
+  tests (since removed from the library — see the "Removed — vendored Ovahol
+  artifacts" section above for the current state).
 - Workbook: the old "Family Rules" sheet is now "Inference Rules" and dumps
   the vendor's actual rule list (whatever fields it sets) instead of assuming
   `Type`/`Family`/`Function`/`Risk` columns. "Lookups" now writes one column
@@ -134,8 +151,12 @@ domain into Ovahol's dimensions to participate. That's fixed now:
   `DefaultTaxonomy()` instead of a vendored Ovahol vocabulary) — prefer the
   `*WithTaxonomy` / `Engine` variants and load your own taxonomy.
 - If you were relying on Ovahol's specific vocabulary being built in, load
-  it explicitly from `examples/taxonomies/ovahol.json` (or your own copy)
-  instead.
+  your own copy instead. The library no longer ships it — the bundled
+  `examples/taxonomies/ovahol.json` and its generator
+  (`cmd/gen-ovahol-taxonomy`) were removed (see the "Removed — vendored Ovahol
+  artifacts" section above); Ovahol generates the taxonomy from its own app,
+  and the `examples/ovahol` demo reads it from the `$OVAHOL_TAXONOMY`
+  environment variable.
 
 ### Corrected — the embedded MeDevIS default taxonomy now uses MeDevIS's own structure
 

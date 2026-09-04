@@ -113,6 +113,20 @@ func TestReconcileIdentityStatusNormalization(t *testing.T) {
 	}
 }
 
+func TestReconcileIdentityStatusSynonymsCaseVariantKey(t *testing.T) {
+	// A synonym-group key that is a case/trim variant of a declared status must
+	// still match (and emit the declared canonical form) — not be skipped by an
+	// exact-key contains check.
+	conv := testOvaholConventions()
+	conv.StatusSynonyms = map[string][]string{
+		"in-service": {"functional", "working"},
+	}
+	out := ReconcileIdentity(IdentityInput{Status: "working"}, nil, conv)
+	if out.Status != "In-Service" {
+		t.Errorf("status %q = %q, want declared canonical %q", "working", out.Status, "In-Service")
+	}
+}
+
 func TestReconcileIdentityStatusSynonyms(t *testing.T) {
 	conv := testOvaholConventions()
 	cases := []struct {

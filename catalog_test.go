@@ -1,7 +1,6 @@
 package ontology
 
 import (
-	"os"
 	"strings"
 	"testing"
 )
@@ -47,7 +46,7 @@ func TestCatalogExactMatch(t *testing.T) {
 }
 
 func TestCatalogFallback(t *testing.T) {
-	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, err := LoadTaxonomyFile("testdata/fixture.json")
 	if err != nil {
 		t.Fatalf("load taxonomy: %v", err)
 	}
@@ -88,8 +87,7 @@ func TestCatalogUnsupportedSourceBypass(t *testing.T) {
 	}
 }
 
-// TestCSVCatalogLoad exercises the generic device-dictionary CSV loader with
-// Ovahol's own column layout.
+// TestCSVCatalogLoad exercises the generic device-dictionary CSV loader.
 func TestCSVCatalogLoad(t *testing.T) {
 	csvData := `Name,Device Type,Device Function,Application Risk,EMDN Code,EMDN Term
 Infusion pump,"Treatment, Surgical & Life Support Devices","Surgical and Intensive Care","Potential patient or operator injury",Z12030301,INFUSION PUMPS
@@ -121,16 +119,17 @@ ECG machine,"Monitoring & Measurement Devices","Additional Physiological Monitor
 }
 
 // TestDictionaryReconciliation is the core migration guarantee: every device
-// in Ovahol's dictionary (devices.csv) reconciles to its exact dictionary
-// (type, function, risk) when a device name is supplied — both through the
-// exact catalog path and through the generated taxonomy's rules alone.
+// in a dictionary reconciles to its exact dictionary (type, function, risk)
+// when a device name is supplied — both through the exact catalog path and
+// through the generated taxonomy's rules alone. The dictionary is a small
+// hermetic inline fixture so the test runs without any local vendor data.
 func TestDictionaryReconciliation(t *testing.T) {
-	dictionary := []CatalogEntry{}
-	f, err := os.Open("devices.csv")
-	if err != nil {
-		t.Fatalf("open devices.csv: %v (run tests from the module root)", err)
-	}
-	defer f.Close()
+	const dictionaryCSV = `Name,Device Type,Device Function,Application Risk,EMDN Code,EMDN Term
+ECG machine,"Monitoring & Measurement Devices","Additional Physiological Monitoring and Diagnostic","Inappropriate therapy or misdiagnosis",Z11010101,ECG MACHINES
+Infusion pump,"Treatment, Surgical & Life Support Devices","Surgical and Intensive Care","Potential patient or operator injury",Z12030301,INFUSION PUMPS
+Chemistry analyzer,"Laboratory & IVD Equipment","Analytical Laboratory","Inappropriate therapy or misdiagnosis",W0201019901,CHEMISTRY ANALYSERS
+Oxygen concentrator,"Medical Gas & Respiratory Devices","Respiratory Care","Potential patient or operator injury",W13010403,OXYGEN CONCENTRATORS
+`
 	cat, err := (CSVCatalog{Columns: map[string]string{
 		"name":                    "Name",
 		"device_type":             "Device Type",
@@ -138,13 +137,13 @@ func TestDictionaryReconciliation(t *testing.T) {
 		"device_application_risk": "Application Risk",
 		"emdn_code":               "EMDN Code",
 		"emdn_term":               "EMDN Term",
-	}}).Load(f)
+	}}).Load(strings.NewReader(dictionaryCSV))
 	if err != nil {
 		t.Fatalf("load dictionary: %v", err)
 	}
-	dictionary = cat.entries
+	dictionary := cat.entries
 
-	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, err := LoadTaxonomyFile("testdata/fixture.json")
 	if err != nil {
 		t.Fatalf("load taxonomy: %v", err)
 	}

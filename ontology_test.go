@@ -2,9 +2,9 @@ package ontology
 
 import "testing"
 
-// ovaholTax loads Ovahol's taxonomy from its example file. Ovahol's vocabulary
-// is no longer the built-in default — it lives in examples/taxonomies/ovahol.json
-// for use/testing only.
+// fixtureTax loads the neutral vendor-agnostic test taxonomy from testdata/.
+// It is a synthetic 4-dimension vocabulary used only to exercise the engine; it
+// is not any vendor's real ontology and is not shipped to consumers.
 
 func TestNormalize(t *testing.T) {
 	tests := []struct {
@@ -43,9 +43,9 @@ func TestNormalize(t *testing.T) {
 			want: "Medical Gas & Respiratory Devices",
 		},
 	}
-	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, err := LoadTaxonomyFile("testdata/fixture.json")
 	if err != nil {
-		t.Fatalf("load ovahol taxonomy: %v", err)
+		t.Fatalf("load fixture taxonomy: %v", err)
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestNormalizeWithMedevisDefault(t *testing.T) {
 }
 
 func TestNormalizeConfidence(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	r := NormalizeWithTaxonomy(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, tax)
 	if r.Confidence == "none" {
 		t.Errorf("expected non-none confidence for valid input, got %q", r.Confidence)
@@ -104,7 +104,7 @@ func TestNormalizeConfidence(t *testing.T) {
 }
 
 func TestNormalizeBatch(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	inputs := []Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 		{DeviceName: "Infusion pump", SourceType: "infusion devices"},
@@ -116,7 +116,7 @@ func TestNormalizeBatch(t *testing.T) {
 }
 
 func TestNormalizeJSON(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	data := []byte(`[{"device_name":"ECG machine","source_type":"monitoring equipment"}]`)
 	results, err := NormalizeJSONWithTaxonomy(data, tax)
 	if err != nil {
@@ -131,7 +131,7 @@ func TestNormalizeJSON(t *testing.T) {
 }
 
 func TestToAPIImportRecords(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	inputs := []Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, // duplicate
@@ -146,7 +146,7 @@ func TestToAPIImportRecords(t *testing.T) {
 }
 
 func TestToCSV(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	results := NormalizeBatchWithTaxonomy([]Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 	}, tax)
@@ -168,7 +168,9 @@ func TestDefaultTaxonomyIsMedevis(t *testing.T) {
 		t.Errorf("expected default taxonomy id 'medevis', got %q", tax.ID)
 	}
 	fd := tax.Field(FieldDeviceType)
-	if fd == nil || len(fd.AllowedValues) != 39 {
+	if fd == nil {
+		t.Error("expected device_type field in default taxonomy")
+	} else if len(fd.AllowedValues) != 39 {
 		t.Errorf("expected 39 medevis device types, got %d", len(fd.AllowedValues))
 	}
 }
@@ -183,7 +185,7 @@ func TestValidateInput(t *testing.T) {
 }
 
 func TestAgnosticJSONFields(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	r := NormalizeWithTaxonomy(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, tax)
 	if r.Name == "" {
 		t.Error("expected non-empty Name")
@@ -219,7 +221,7 @@ func TestAgnosticJSONFields(t *testing.T) {
 }
 
 func TestStreamlinedFields(t *testing.T) {
-	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, _ := LoadTaxonomyFile("testdata/fixture.json")
 	r := NormalizeWithTaxonomy(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"}, tax)
 	if r.GetField(FieldDeviceType) != "Treatment, Surgical & Life Support Devices" {
 		t.Errorf("unexpected device_type: %q", r.GetField(FieldDeviceType))

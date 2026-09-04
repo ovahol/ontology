@@ -4,7 +4,7 @@
 // The engine is system-agnostic: it only executes what the vendor supplies.
 // This example shows Ovahol supplying, in ONE place (its app layer):
 //
-//   - its taxonomy (fields + rules)          -> engine.WithTaxonomy
+//   - its taxonomy (fields + rules)          -> engine.NewEngine's taxonomy arg
 //   - its device dictionary as a Catalog     -> engine.WithCatalog
 //   - its identity conventions (the "Unknown"
 //     placeholders + the controlled status set) -> engine.WithConventions
@@ -91,8 +91,15 @@ func (r *ovaholResolver) Resolve(in ontology.IdentityInput) (ontology.IdentityRe
 func main() {
 	root := "."
 
-	// Ovahol supplies its taxonomy (fields + rules).
-	tax, err := ontology.LoadTaxonomyFile(root + "/examples/taxonomies/ovahol.json")
+	// Ovahol supplies its taxonomy (fields + rules). The taxonomy is Ovahol's
+	// own artifact — this library does not ship it — so the example reads it
+	// from wherever Ovahol's app keeps it, via $OVAHOL_TAXONOMY.
+	taxPath := os.Getenv("OVAHOL_TAXONOMY")
+	if taxPath == "" {
+		log.Fatal("set OVAHOL_TAXONOMY to the path of your Ovahol taxonomy JSON " +
+			"(e.g. the taxonomy export from the ovahol app); this library does not vendor it")
+	}
+	tax, err := ontology.LoadTaxonomyFile(taxPath)
 	if err != nil {
 		log.Fatalf("load taxonomy: %v", err)
 	}
@@ -200,22 +207,25 @@ func main() {
 // a CSV snapshot for the example.
 func loadIdentityData(r *ovaholResolver, root string) {
 	for _, rec := range readCSV(root + "/models.csv") {
-		name := strings.TrimSpace(rec[0])
-		brand := strings.TrimSpace(rec[1])
-		device := strings.TrimSpace(rec[2])
-		if name == "" {
+		if len(rec) < 3 {
 			continue
 		}
-		r.modelByBrand[name] = brand
-		r.modelDevice[name] = device
+		name := strings.TrimSpace(rec[0])
+		if name == "" || name == "Name" {
+			continue
+		}
+		r.modelByBrand[name] = strings.TrimSpace(rec[1])
+		r.modelDevice[name] = strings.TrimSpace(rec[2])
 	}
 	for _, rec := range readCSV(root + "/brands.csv") {
-		name := strings.TrimSpace(rec[0])
-		mfr := strings.TrimSpace(rec[1])
-		if name == "" {
+		if len(rec) < 2 {
 			continue
 		}
-		r.brandMfr[name] = mfr
+		name := strings.TrimSpace(rec[0])
+		if name == "" || name == "Name" {
+			continue
+		}
+		r.brandMfr[name] = strings.TrimSpace(rec[1])
 	}
 }
 

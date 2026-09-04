@@ -2,3 +2,5 @@
 *.csv
 *.test
 device-records-lifecycle-*.json
+.claude
+/ovahol

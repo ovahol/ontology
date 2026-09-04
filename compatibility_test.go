@@ -5,20 +5,19 @@ import (
 	"testing"
 )
 
-// TestOvaholCompatibility ensures that when ontology is run against Ovahol's
-// taxonomy, its output is always compatible with what Ovahol expects. Ovahol's
-// vocabulary is no longer vendored in this repo — it lives in
-// examples/taxonomies/ovahol.json (for testing only). If Ovahol's seed/lookup
-// changes, either this file or that taxonomy must be updated — that signals drift.
-//
-// Source of truth for expected values: backend/internal/seed/lookup/data.go
-// in the ovahol monorepo.
+// TestCompatibility fixtures ensure that when ontology is run against a
+// taxonomy, its output is always compatible with that taxonomy's declared
+// controlled vocabulary: every dimension the rules assign is within the field's
+// allowed_values, and normalized output never leaks free text into a controlled
+// field. The fixture (testdata/fixture.json) is a neutral, synthetic vocabulary
+// used purely to exercise these invariants; no vendor's real ontology is
+// vendored in this repo.
 
-func loadOvaholTax(t *testing.T) *Taxonomy {
+func loadFixtureTax(t *testing.T) *Taxonomy {
 	t.Helper()
-	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+	tax, err := LoadTaxonomyFile("testdata/fixture.json")
 	if err != nil {
-		t.Fatalf("LoadTaxonomyFile(ovahol.json): %v", err)
+		t.Fatalf("LoadTaxonomyFile(fixture.json): %v", err)
 	}
 	return tax
 }
@@ -34,7 +33,7 @@ func allowedSet(tax *Taxonomy, key string) map[string]bool {
 }
 
 func TestCompatibility_Fields(t *testing.T) {
-	tax := loadOvaholTax(t)
+	tax := loadFixtureTax(t)
 	wantCounts := map[string]int{
 		FieldDeviceType:            8,
 		FieldDeviceCategory:        4,
@@ -44,7 +43,7 @@ func TestCompatibility_Fields(t *testing.T) {
 	for key, want := range wantCounts {
 		fd := tax.Field(key)
 		if fd == nil {
-			t.Fatalf("ovahol taxonomy missing field %q", key)
+			t.Fatalf("fixture taxonomy missing field %q", key)
 		}
 		if len(fd.AllowedValues) != want {
 			t.Errorf("field %q has %d allowed_values, want %d", key, len(fd.AllowedValues), want)
@@ -52,14 +51,14 @@ func TestCompatibility_Fields(t *testing.T) {
 	}
 }
 
-// TestCompatibility_Rules ensures every rule in Ovahol's taxonomy only ever
+// TestCompatibility_Rules ensures every rule in the fixture taxonomy only ever
 // assigns values that are within that field's declared controlled
 // vocabulary — the same guarantee the old hardcoded FamilyRule/TypeDefaults
 // validity checks gave, now expressed generically over Rule.Set.
 func TestCompatibility_Rules(t *testing.T) {
-	tax := loadOvaholTax(t)
+	tax := loadFixtureTax(t)
 	if tax.Inference == nil || len(tax.Inference.Rules) == 0 {
-		t.Fatal("ovahol taxonomy has no inference rules")
+		t.Fatal("fixture taxonomy has no inference rules")
 	}
 	validByField := map[string]map[string]bool{
 		FieldDeviceType:            allowedSet(tax, FieldDeviceType),
@@ -93,8 +92,8 @@ func TestCompatibility_Rules(t *testing.T) {
 	}
 }
 
-func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
-	tax := loadOvaholTax(t)
+func TestCompatibility_NormalizeOutputIsFixtureValid(t *testing.T) {
+	tax := loadFixtureTax(t)
 	validTypes := allowedSet(tax, FieldDeviceType)
 	validFuncs := allowedSet(tax, FieldDeviceFunction)
 	validRisks := allowedSet(tax, FieldDeviceApplicationRisk)
@@ -143,7 +142,7 @@ func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
 }
 
 func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
-	tax := loadOvaholTax(t)
+	tax := loadFixtureTax(t)
 	validTypes := allowedSet(tax, FieldDeviceType)
 	// Inputs whose Name would ideally be vendor-neutral. The library
 	// does best-effort humanization but may retain some vendor tokens for
@@ -171,7 +170,7 @@ func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
 }
 
 func TestCompatibility_JSONInterchangeRoundTrips(t *testing.T) {
-	tax := loadOvaholTax(t)
+	tax := loadFixtureTax(t)
 	inputJSON := `[
 		{"device_name": "ECG machine", "source_type": "monitoring equipment"},
 		{"device_name": "Infusion pump", "source_type": "infusion devices", "emdn_term": "Infusion pumps"}
@@ -202,7 +201,7 @@ func TestCompatibility_JSONInterchangeRoundTrips(t *testing.T) {
 }
 
 func TestCompatibility_ToAPIImportRecordsAreValid(t *testing.T) {
-	tax := loadOvaholTax(t)
+	tax := loadFixtureTax(t)
 	results := NormalizeBatchWithTaxonomy([]Input{
 		{DeviceName: "ECG machine", SourceType: "monitoring equipment"},
 		{DeviceName: "Infusion pump", SourceType: "infusion devices"},

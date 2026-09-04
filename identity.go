@@ -156,23 +156,27 @@ func normalizeStatus(raw string, statuses []string, synonyms map[string][]string
 		}
 	}
 	for canonical, terms := range synonyms {
-		if !containsString(statuses, canonical) {
+		declared := canonicalStatusFor(statuses, canonical)
+		if declared == "" {
 			continue
 		}
 		for _, term := range terms {
 			if strings.EqualFold(raw, strings.TrimSpace(term)) {
-				return canonical
+				return declared
 			}
 		}
 	}
 	return strings.TrimSpace(defaultStatus)
 }
 
-func containsString(xs []string, want string) bool {
-	for _, x := range xs {
-		if x == want {
-			return true
+// canonicalStatusFor returns the status member of statuses that equals the
+// given synonym-group key case-insensitively (and trimmed), or "" when the key
+// is not a declared status. Comparisons mirror the Statuses matching loop.
+func canonicalStatusFor(statuses []string, key string) string {
+	for _, s := range statuses {
+		if strings.EqualFold(strings.TrimSpace(key), strings.TrimSpace(s)) {
+			return strings.TrimSpace(s)
 		}
 	}
-	return false
+	return ""
 }
