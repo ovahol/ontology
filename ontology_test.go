@@ -153,14 +153,30 @@ func TestAgnosticJSONFields(t *testing.T) {
 	if r.DeviceFunction == "" {
 		t.Error("expected non-empty DeviceFunction")
 	}
-	// Ensure legacy keys not present, streamlined keys present
+	// Ensure legacy top-level keys not present, streamlined keys present.
+	// Golden-file migration: new "fields" map carries pluggable dimensions including device_family,
+	// so we only reject legacy top-level keys (ovahol_*, common_name, canonical_name, search_aliases)
+	// not the presence of device_family inside fields.
 	data, _ := ToJSON([]Result{r})
 	s := string(data)
-	if contains(s, "\"ovahol_device_type\"") || contains(s, "\"ovahol_device_family\"") || contains(s, "\"common_name\":") || contains(s, "\"device_family\"") {
-		t.Errorf("JSON still contains legacy keys: %s", s)
+	if contains(s, "\"ovahol_device_type\"") || contains(s, "\"ovahol_device_family\"") || contains(s, "\"common_name\"") || contains(s, "\"canonical_name\"") || contains(s, "\"search_aliases\"") {
+		t.Errorf("JSON still contains legacy top-level keys: %s", s)
 	}
 	if !contains(s, "\"name\"") || !contains(s, "\"device_type\"") || !contains(s, "\"device_category\"") || !contains(s, "\"device_function\"") || !contains(s, "\"device_application_risk\"") {
 		t.Errorf("JSON missing streamlined keys: %s", s)
+	}
+	// Pluggable Fields shim must be present and mirrored to deprecated accessors.
+	if r.Fields == nil {
+		t.Error("expected non-nil Fields map (pluggable shim)")
+	}
+	if r.Fields[FieldDeviceType] != r.DeviceType {
+		t.Errorf("Fields[device_type] %q != DeviceType %q (shim sync)", r.Fields[FieldDeviceType], r.DeviceType)
+	}
+	if r.GetField(FieldDeviceType) != r.DeviceType {
+		t.Errorf("GetField mismatch")
+	}
+	if r.DeviceTypeAccessor() != r.DeviceType {
+		t.Errorf("deprecated accessor mismatch")
 	}
 }
 

@@ -118,15 +118,29 @@ func (c *InMemoryCatalog) Find(input Input) (*CatalogEntry, bool) {
 }
 
 // NormalizeWithCatalog is like Normalize but consults cat first.
+//
+// Deprecated: use NormalizeWithCatalogAndTaxonomy.
 func NormalizeWithCatalog(input Input, cat Catalog) Result {
+	return NormalizeWithCatalogAndTaxonomy(input, cat, nil)
+}
+
+// NormalizeWithCatalogAndTaxonomy is the vocab-less catalog entry point.
+func NormalizeWithCatalogAndTaxonomy(input Input, cat Catalog, tax *Taxonomy) Result {
 	if cat != nil {
 		if entry, ok := cat.Find(input); ok && entry != nil {
 			category := entry.DeviceCategory
 			if category == "" {
 				category = CategoryForFunction(entry.DeviceFunction)
 			}
+			fields := map[string]string{
+				FieldDeviceType:            entry.DeviceType,
+				FieldDeviceCategory:        category,
+				FieldDeviceFunction:        entry.DeviceFunction,
+				FieldDeviceApplicationRisk: entry.DeviceApplicationRisk,
+			}
 			return Result{
 				Name:                  entry.Name,
+				Fields:                fields,
 				DeviceType:            entry.DeviceType,
 				DeviceCategory:        category,
 				DeviceFunction:        entry.DeviceFunction,
@@ -141,14 +155,21 @@ func NormalizeWithCatalog(input Input, cat Catalog) Result {
 			}
 		}
 	}
-	return Normalize(input)
+	return NormalizeWithTaxonomy(input, tax)
 }
 
 // NormalizeBatchWithCatalog is the batch analogue.
+//
+// Deprecated: use NormalizeBatchWithCatalogAndTaxonomy.
 func NormalizeBatchWithCatalog(inputs []Input, cat Catalog) []Result {
+	return NormalizeBatchWithCatalogAndTaxonomy(inputs, cat, nil)
+}
+
+// NormalizeBatchWithCatalogAndTaxonomy is the vocab-less batch entry point.
+func NormalizeBatchWithCatalogAndTaxonomy(inputs []Input, cat Catalog, tax *Taxonomy) []Result {
 	out := make([]Result, 0, len(inputs))
 	for _, in := range inputs {
-		out = append(out, NormalizeWithCatalog(in, cat))
+		out = append(out, NormalizeWithCatalogAndTaxonomy(in, cat, tax))
 	}
 	return out
 }

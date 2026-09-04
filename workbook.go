@@ -113,7 +113,7 @@ func colLetter(n int) string {
 	return letter
 }
 
-func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]string) (string, error) {
+func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]string, tax *Taxonomy) (string, error) {
 	// Delete and recreate as first sheet
 	idx, err := f.GetSheetIndex(sheetName)
 	if err == nil {
@@ -138,7 +138,7 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 		styleHeader(f, sheetName, cell)
 	}
 	for rowIdx, row := range rows {
-		resolved := ResolveRowNaming(row)
+		resolved := ResolveRowNamingFor(row, tax)
 		values := []string{
 			resolved.Name,
 			resolved.DeviceType,
@@ -168,7 +168,7 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 	return sheetName, nil
 }
 
-func rebuildAPIImportSheet(f *excelize.File, devicesSheet string) error {
+func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
 	sheet := "API Import"
 	// delete if exists
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
@@ -227,7 +227,24 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string) error {
 		if values[0] == "" || values[1] == "" || values[2] == "" || values[3] == "" || values[4] == "" {
 			continue
 		}
-		key := strings.Join(values, "\x00")
+		// Generalized dedup: use APIImportRecord.DedupKey() so pluggable Fields participate automatically.
+		// For workbook rows we synthesize an APIImportRecord and delegate key generation.
+		rec := APIImportRecord{
+			Name:                  values[0],
+			DeviceType:            values[1],
+			DeviceCategory:        values[2],
+			DeviceFunction:        values[3],
+			DeviceApplicationRisk: values[4],
+			EMDNCode:              values[5],
+			EMDNTerm:              values[6],
+			Fields: map[string]string{
+				FieldDeviceType:            values[1],
+				FieldDeviceCategory:        values[2],
+				FieldDeviceFunction:        values[3],
+				FieldDeviceApplicationRisk: values[4],
+			},
+		}
+		key := rec.DedupKey()
 		if seen[key] {
 			continue
 		}
@@ -248,7 +265,7 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string) error {
 	return nil
 }
 
-func rebuildLookupsSheet(f *excelize.File) error {
+func rebuildLookupsSheet(f *excelize.File, tax *Taxonomy) error {
 	sheet := "Lookups"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -298,7 +315,7 @@ func rebuildLookupsSheet(f *excelize.File) error {
 	return nil
 }
 
-func rebuildNamingRulesSheet(f *excelize.File) error {
+func rebuildNamingRulesSheet(f *excelize.File, tax *Taxonomy) error {
 	sheet := "Naming Rules"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -332,7 +349,7 @@ func rebuildNamingRulesSheet(f *excelize.File) error {
 	return nil
 }
 
-func rebuildFamilyRulesSheet(f *excelize.File) error {
+func rebuildFamilyRulesSheet(f *excelize.File, tax *Taxonomy) error {
 	sheet := "Family Rules"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -375,7 +392,7 @@ func rebuildFamilyRulesSheet(f *excelize.File) error {
 	return nil
 }
 
-func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string) error {
+func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
 	sheet := "Common Name Mapping Review"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -417,7 +434,7 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string) 
 			"Source device type": get("Source device type"),
 			"EMDN term":          get("EMDN term"),
 		}
-		resolved := ResolveRowNaming(rmap)
+		resolved := ResolveRowNamingFor(rmap, tax)
 		values := []string{
 			get("Legacy source name"),
 			get("Name"),
@@ -668,7 +685,7 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 	return nil
 }
 
-func applyValidations(f *excelize.File, sheet string, maxRow int) error {
+func applyValidations(f *excelize.File, sheet string, maxRow int, tax *Taxonomy) error {
 	typeEnd := 1 + len(DeviceTypes)
 	categoryEnd := 1 + len(DeviceCategories)
 	funcEnd := 1 + len(DeviceFunctions)
@@ -690,7 +707,7 @@ func applyValidations(f *excelize.File, sheet string, maxRow int) error {
 	return nil
 }
 
-func writeAPIImportCSV(f *excelize.File, devicesSheet, outputPath string) (string, error) {
+func writeAPIImportCSV(f *excelize.File, devicesSheet, outputPath string, tax *Taxonomy) (string, error) {
 	rows, err := f.GetRows(devicesSheet)
 	if err != nil {
 		return "", err
@@ -756,15 +773,27 @@ func limit(s []string, n int) []string {
 	return s[:n]
 }
 
-// UpdateOntology is the main entrypoint, mirroring Python's main().
-// NormalizeWorkbook is the workbook interchange entry point for bulk migration.
-// It reads any spreadsheet with at least a device name column, normalizes
-// every row through the ontology, and writes a fully populated
-// workbook plus a deduplicated API-import CSV.
-//
-// UpdateOntology is kept as an alias for backward compatibility with the
-// original Python script's naming.
+// NormalizeWorkbook normalizes an input workbook using the built-in Ovahol rules.
 func NormalizeWorkbook(inputPath, outputPath string) (string, error) {
+	return NormalizeWorkbookWithTaxonomy(inputPath, outputPath, nil)
+}
+
+// NormalizeWorkbookAs is the vendor-aware workbook entry point. It accepts
+// a loaded *Taxonomy and normalizes the workbook using that taxonomy.
+func NormalizeWorkbookAs(inputPath, outputPath string, tax interface{}) (string, error) {
+	if t, ok := tax.(*Taxonomy); ok {
+		return NormalizeWorkbookWithTaxonomy(inputPath, outputPath, t)
+	}
+	return NormalizeWorkbook(inputPath, outputPath)
+}
+
+// NormalizeWorkbookWithTaxonomy normalizes a workbook with the given vendor taxonomy.
+func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) (string, error) {
+	if tax != nil {
+		if err := tax.Validate(); err != nil {
+			return "", err
+		}
+	}
 	f, err := excelize.OpenFile(inputPath)
 	if err != nil {
 		return "", fmt.Errorf("open input: %w", err)
@@ -779,23 +808,23 @@ func NormalizeWorkbook(inputPath, outputPath string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	devicesSheet, err := rebuildDevicesSheet(f, firstSheet, rows)
+	devicesSheet, err := rebuildDevicesSheet(f, firstSheet, rows, tax)
 	if err != nil {
 		return "", err
 	}
-	if err := rebuildAPIImportSheet(f, devicesSheet); err != nil {
+	if err := rebuildAPIImportSheet(f, devicesSheet, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildLookupsSheet(f); err != nil {
+	if err := rebuildLookupsSheet(f, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildNamingRulesSheet(f); err != nil {
+	if err := rebuildNamingRulesSheet(f, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildFamilyRulesSheet(f); err != nil {
+	if err := rebuildFamilyRulesSheet(f, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildCommonNameMappingReviewSheet(f, devicesSheet); err != nil {
+	if err := rebuildCommonNameMappingReviewSheet(f, devicesSheet, tax); err != nil {
 		return "", err
 	}
 	if err := rebuildFamilyNamingReviewSheet(f, devicesSheet); err != nil {
@@ -810,7 +839,7 @@ func NormalizeWorkbook(inputPath, outputPath string) (string, error) {
 	if maxRow < 2 {
 		maxRow = 2
 	}
-	if err := applyValidations(f, devicesSheet, maxRow); err != nil {
+	if err := applyValidations(f, devicesSheet, maxRow, tax); err != nil {
 		return "", err
 	}
 	if err := os.MkdirAll(filepath.Dir(outputPath), 0755); err != nil {
@@ -819,7 +848,7 @@ func NormalizeWorkbook(inputPath, outputPath string) (string, error) {
 	if err := f.SaveAs(outputPath); err != nil {
 		return "", err
 	}
-	csvPath, err := writeAPIImportCSV(f, devicesSheet, outputPath)
+	csvPath, err := writeAPIImportCSV(f, devicesSheet, outputPath, tax)
 	if err != nil {
 		return "", err
 	}
@@ -832,11 +861,13 @@ func UpdateOntology(inputPath, outputPath string) (string, error) {
 	return NormalizeWorkbook(inputPath, outputPath)
 }
 
-// NormalizeCSV reads a CSV file with interchange columns (at minimum
-// "Legacy source name" or "Device name" and "Source device type") and
-// returns normalized Results. The CSV header row is flexible — the same
-// tolerant header matching as the workbook path is used.
+// NormalizeCSV reads a CSV file with interchange columns and returns normalized Results.
 func NormalizeCSV(path string) ([]Result, error) {
+	return NormalizeCSVWithTaxonomy(path, nil)
+}
+
+// NormalizeCSVWithTaxonomy normalizes a CSV file using the given vendor taxonomy.
+func NormalizeCSVWithTaxonomy(path string, tax *Taxonomy) ([]Result, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("ontology: open CSV %s: %w", path, err)
@@ -893,7 +924,7 @@ func NormalizeCSV(path string) ([]Result, error) {
 		if in.DeviceName == "" && in.SourceType == "" && in.EMDNCode == "" && in.EMDNTerm == "" {
 			continue
 		}
-		results = append(results, Normalize(in))
+		results = append(results, NormalizeWithTaxonomy(in, tax))
 	}
 	return results, nil
 }

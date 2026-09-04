@@ -1,0 +1,3385 @@
+{
+  "id": "ovahol-ontology",
+  "version": "1.0.0",
+  "schemaVersion": "1.0.0",
+  "deviceTypes": [
+    {
+      "name": "Monitoring \u0026 Measurement Devices",
+      "code": "MONITORING_MEASUREMENT_DEVICES"
+    },
+    {
+      "name": "Diagnostic \u0026 Imaging Devices",
+      "code": "DIAGNOSTIC_IMAGING_DEVICES"
+    },
+    {
+      "name": "Treatment, Surgical \u0026 Life Support Devices",
+      "code": "TREATMENT_SURGICAL_LIFE_SUPPORT_DEVICES"
+    },
+    {
+      "name": "Laboratory \u0026 IVD Equipment",
+      "code": "LABORATORY_IVD_EQUIPMENT"
+    },
+    {
+      "name": "Medical Gas \u0026 Respiratory Devices",
+      "code": "MEDICAL_GAS_RESPIRATORY_DEVICES"
+    },
+    {
+      "name": "Sterilization \u0026 Infection Control Devices",
+      "code": "STERILIZATION_INFECTION_CONTROL_DEVICES"
+    },
+    {
+      "name": "Support Equipment \u0026 Furniture",
+      "code": "SUPPORT_EQUIPMENT_FURNITURE"
+    },
+    {
+      "name": "Consumables \u0026 Accessories",
+      "code": "CONSUMABLES_ACCESSORIES"
+    }
+  ],
+  "deviceCategories": [
+    {
+      "name": "Therapeutic",
+      "code": "THERAPEUTIC"
+    },
+    {
+      "name": "Diagnostic",
+      "code": "DIAGNOSTIC"
+    },
+    {
+      "name": "Analytical",
+      "code": "ANALYTICAL"
+    },
+    {
+      "name": "Miscellaneous",
+      "code": "MISCELLANEOUS"
+    }
+  ],
+  "deviceFunctions": [
+    {
+      "name": "Life Support",
+      "code": "LIFE_SUPPORT",
+      "category": "Therapeutic",
+      "score": 10
+    },
+    {
+      "name": "Surgical and Intensive Care",
+      "code": "SURGICAL_INTENSIVE_CARE",
+      "category": "Therapeutic",
+      "score": 9
+    },
+    {
+      "name": "Physical Therapy and Treatment",
+      "code": "PHYSICAL_THERAPY_TREATMENT",
+      "category": "Therapeutic",
+      "score": 8
+    },
+    {
+      "name": "Surgical and Intensive Care Monitoring",
+      "code": "CRITICAL_CARE_MONITORING",
+      "category": "Diagnostic",
+      "score": 7
+    },
+    {
+      "name": "Additional Physiological Monitoring and Diagnostic",
+      "code": "GENERAL_PHYSIOLOGICAL_MONITORING",
+      "category": "Diagnostic",
+      "score": 6
+    },
+    {
+      "name": "Analytical Laboratory",
+      "code": "ANALYTICAL_LABORATORY",
+      "category": "Analytical",
+      "score": 5
+    },
+    {
+      "name": "Laboratory Accessories",
+      "code": "LABORATORY_ACCESSORIES",
+      "category": "Analytical",
+      "score": 4
+    },
+    {
+      "name": "Computers and Related",
+      "code": "COMPUTERS_AND_IT",
+      "category": "Analytical",
+      "score": 3
+    },
+    {
+      "name": "Patient Related and Other",
+      "code": "PATIENT_RELATED_OTHER",
+      "category": "Miscellaneous",
+      "score": 2
+    }
+  ],
+  "deviceApplicationRisks": [
+    {
+      "description": "Potential patient death",
+      "score_point": 5
+    },
+    {
+      "description": "Potential patient or operator injury",
+      "score_point": 4
+    },
+    {
+      "description": "Inappropriate therapy or misdiagnosis",
+      "score_point": 3
+    },
+    {
+      "description": "Equipment damage",
+      "score_point": 2
+    },
+    {
+      "description": "No significant identified risk",
+      "score_point": 1
+    }
+  ],
+  "inference": {
+    "typeByKeyword": [
+      {
+        "keywords": [
+          "software",
+          "pacs",
+          "electronic medical record",
+          "emr",
+          "ehr",
+          "clinical information system"
+        ],
+        "type": "DIGITAL_HEALTH_CLINICAL_SOFTWARE"
+      },
+      {
+        "keywords": [
+          "calibration",
+          "quality control",
+          "testing system",
+          "tester",
+          "test equipment",
+          "patient simulator",
+          "simulator",
+          "phantom",
+          "electrical safety"
+        ],
+        "type": "BIOMEDICAL_TEST_CALIBRATION_QUALITY_ASSURANCE"
+      },
+      {
+        "keywords": [
+          "ultrasound",
+          "x ray",
+          "xray",
+          "ct ",
+          "computed tomography",
+          "mri",
+          "magnetic resonance",
+          "fluoroscopy",
+          "mammograph",
+          "radiograph",
+          "nuclear medicine",
+          "gamma camera",
+          "endoscope",
+          "bronchoscope",
+          "cystoscope",
+          "colposcope",
+          "laparoscope",
+          "arthroscope",
+          "otoscope",
+          "ophthalmoscope"
+        ],
+        "type": "DIAGNOSTIC_IMAGING_VISUALIZATION"
+      },
+      {
+        "keywords": [
+          "ivd",
+          "reagent",
+          "assay",
+          "hematology",
+          "chemistry analyzer",
+          "chemistry analyser",
+          "centrifuge",
+          "microscope",
+          "pcr",
+          "blood gas",
+          "laboratory",
+          "specimen",
+          "sample"
+        ],
+        "type": "LABORATORY_IN_VITRO_DIAGNOSTICS"
+      },
+      {
+        "keywords": [
+          "oxygen",
+          "suction",
+          "airway",
+          "nebul",
+          "flowmeter",
+          "humidifier",
+          "psa",
+          "breathing circuit",
+          "respiratory",
+          "cpap",
+          "bipap",
+          "aspirator"
+        ],
+        "type": "MEDICAL_GAS_RESPIRATORY_SUCTION"
+      },
+      {
+        "keywords": [
+          "ventilator",
+          "infusion",
+          "syringe pump",
+          "defibrillator",
+          "dialysis",
+          "anaesthesia",
+          "anesthesia",
+          "electrosurgical",
+          "pacemaker",
+          "cardioverter",
+          "apheresis",
+          "resuscitator",
+          "life support"
+        ],
+        "type": "THERAPEUTIC_LIFE_SUPPORT"
+      },
+      {
+        "keywords": [
+          "monitor",
+          "ecg",
+          "eeg",
+          "tonometer",
+          "audiometer",
+          "spirom",
+          "pulmonary function",
+          "bilirubinometer",
+          "vital signs",
+          "blood pressure",
+          "stethoscope"
+        ],
+        "type": "CLINICAL_MONITORING_ASSESSMENT"
+      },
+      {
+        "keywords": [
+          "wheelchair",
+          "walker",
+          "crutch",
+          "prosthe",
+          "ortho",
+          "mobility",
+          "assistive",
+          "rehabilitation",
+          "physiotherapy"
+        ],
+        "type": "REHABILITATION_MOBILITY_ASSISTIVE"
+      },
+      {
+        "keywords": [
+          "steriliz",
+          "autoclave",
+          "disinfect",
+          "decontamin",
+          "ipc",
+          "glove",
+          "mask",
+          "gown",
+          "apron"
+        ],
+        "type": "INFECTION_PREVENTION_DECONTAMINATION_STERILIZATION"
+      },
+      {
+        "keywords": [
+          "surgical",
+          "instrument",
+          "tray",
+          "trocar",
+          "catheter",
+          "cannula",
+          "implant",
+          "clip",
+          "stent",
+          "laparoscopy",
+          "dental",
+          "oral",
+          "iud",
+          "intra uterine",
+          "intra uterine system",
+          "anoscope",
+          "scope sheath"
+        ],
+        "type": "SURGICAL_INTERVENTIONAL"
+      },
+      {
+        "keywords": [
+          "dressing",
+          "gauze",
+          "bandage",
+          "pad",
+          "syringe",
+          "needle",
+          "tube",
+          "drainage",
+          "bag",
+          "collection",
+          "accessory",
+          "swab",
+          "suture",
+          "condom",
+          "diaphragm",
+          "cervical cap"
+        ],
+        "type": "CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES"
+      },
+      {
+        "keywords": [
+          "bed",
+          "cabinet",
+          "ambulance",
+          "vehicle",
+          "chart",
+          "stationery",
+          "waste",
+          "clock",
+          "printer",
+          "data logger",
+          "lamp",
+          "radiation shielding",
+          "shielding"
+        ],
+        "type": "FACILITY_UTILITY_ENVIRONMENTAL_SUPPORT"
+      }
+    ],
+    "sourceTypeMap": {
+      "assistive products": "Support Equipment \u0026 Furniture",
+      "cleaning disinfection sterilization equipment": "Sterilization \u0026 Infection Control Devices",
+      "cleaning disinfection sterilization solutions": "Sterilization \u0026 Infection Control Devices",
+      "consumables for medical equipment": "Consumables \u0026 Accessories",
+      "dressings gauzes bandages pads": "Consumables \u0026 Accessories",
+      "imaging nuclear medicine equipment": "Diagnostic \u0026 Imaging Devices",
+      "in vitro diagnostic tests": "Laboratory \u0026 IVD Equipment",
+      "infection prevention and control ipc": "Sterilization \u0026 Infection Control Devices",
+      "infusion devices": "Treatment, Surgical \u0026 Life Support Devices",
+      "laboratory equipment": "Laboratory \u0026 IVD Equipment",
+      "medical charts stationery": "Support Equipment \u0026 Furniture",
+      "medical furniture": "Support Equipment \u0026 Furniture",
+      "medical gas equipment": "Medical Gas \u0026 Respiratory Devices",
+      "monitoring equipment": "Monitoring \u0026 Measurement Devices",
+      "quality assurance calibration maintenance devices": "Support Equipment \u0026 Furniture",
+      "radiotherapy related equipment": "Treatment, Surgical \u0026 Life Support Devices",
+      "rehabilitation devices": "Support Equipment \u0026 Furniture",
+      "respiratory accessories": "Medical Gas \u0026 Respiratory Devices",
+      "simulators trainers": "Support Equipment \u0026 Furniture",
+      "software": "Support Equipment \u0026 Furniture",
+      "surgical instruments trays and bowls": "Treatment, Surgical \u0026 Life Support Devices",
+      "sutures": "Consumables \u0026 Accessories",
+      "syringes and needles": "Consumables \u0026 Accessories",
+      "tubes and cannulae": "Consumables \u0026 Accessories",
+      "vector control equipment": "Support Equipment \u0026 Furniture",
+      "vehicles": "Support Equipment \u0026 Furniture",
+      "waste management products": "Support Equipment \u0026 Furniture"
+    },
+    "supportedSourceTypes": {
+      "imaging nuclear medicine equipment": {},
+      "infusion devices": {},
+      "laboratory equipment": {},
+      "measurement devices": {},
+      "medical equipment": {},
+      "medical furniture": {},
+      "medical gas equipment": {},
+      "monitoring equipment": {}
+    },
+    "familyRules": [
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Imaging workflow and visualization accessories",
+        "CommonName": "Multi-syringe contrast media injector",
+        "CanonicalName": "Multi-syringe contrast media injector",
+        "Function": "Surgical and Intensive Care Monitoring",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "multi syringe contrast media injector"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Angiography and catheterization imaging systems",
+        "CommonName": "Cardiac catheterization laboratory system",
+        "CanonicalName": "Cardiac catheterization laboratory system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "cardiac catheterization laboratory system"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Sample preparation and laboratory support",
+        "CommonName": "CO2 blood gas electrode",
+        "CanonicalName": "CO2 blood gas electrode",
+        "Function": "Analytical Laboratory",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "co2 blood gas electrode"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Diagnostic instrument monitor card",
+        "CanonicalName": "Diagnostic instrument monitor card",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "diagnostic instrument monitor card"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Dialysis and extracorporeal therapy systems",
+        "CommonName": "Extracorporeal membrane oxygenation (ECMO)",
+        "CanonicalName": "Extracorporeal membrane oxygenation (ECMO)",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "extracorporeal membrane oxygenation ecmo"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Medical label / report printer",
+        "CanonicalName": "Medical label / report printer",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "medical label report printer"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Oxygen supply systems",
+        "CommonName": "MRI-compatible oxygen canister",
+        "CanonicalName": "MRI-compatible oxygen canister",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "mri compatible oxygen canister"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Infusion and medication delivery systems",
+        "CommonName": "Parenteral / enteral solution bag",
+        "CanonicalName": "Parenteral / enteral solution bag",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "parenteral enteral solution bag"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Sample preparation and laboratory support",
+        "CommonName": "RNA/DNA extraction system",
+        "CanonicalName": "RNA/DNA extraction system",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "rna dna extraction system"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Blood bag scale",
+        "CanonicalName": "Blood bag scale",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "blood bag scale"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Sample preparation and laboratory support",
+        "CommonName": "Blood collection pipette",
+        "CanonicalName": "Blood collection pipette",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "blood collection pipette"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory containers and disposables",
+        "CommonName": "Capillary blood tube",
+        "CanonicalName": "Capillary blood tube",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "capillary blood tube"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory containers and disposables",
+        "CommonName": "Cell culture tube",
+        "CanonicalName": "Cell culture tube",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "cell culture tube"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Cotton applicator sticks",
+        "CanonicalName": "Cotton applicator sticks",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "cotton applicator sticks"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Critical care monitoring systems",
+        "CommonName": "CT display monitor",
+        "CanonicalName": "CT display monitor",
+        "Function": "Surgical and Intensive Care Monitoring",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "ct display monitor"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "General surgical and interventional instruments",
+        "CommonName": "Diagnostic examination set",
+        "CanonicalName": "Diagnostic examination set",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "diagnostic examination set"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Critical care monitoring systems",
+        "CommonName": "Dialysis central monitor",
+        "CanonicalName": "Dialysis central monitor",
+        "Function": "Surgical and Intensive Care Monitoring",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "dialysis central monitor"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Imaging, ophthalmic, and procedural consumables",
+        "CommonName": "Fiducial marker (radiotherapy)",
+        "CanonicalName": "Fiducial marker (radiotherapy)",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "fiducial marker radiotherapy"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Medical furniture and fixtures",
+        "CommonName": "Fixed surgical light",
+        "CanonicalName": "Fixed surgical light",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "fixed surgical light"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Hot air sterilizer",
+        "CanonicalName": "Hot air sterilizer",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "hot air sterilizer"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Medical furniture and fixtures",
+        "CommonName": "Mobile surgical light",
+        "CanonicalName": "Mobile surgical light",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "mobile surgical light"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Therapeutic energy systems",
+        "CommonName": "Nd: Yag laser",
+        "CanonicalName": "Nd: Yag laser",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "nd yag laser"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Airway gas monitoring accessories",
+        "CommonName": "Respiratory gas monitor",
+        "CanonicalName": "Respiratory gas monitor",
+        "Function": "Surgical and Intensive Care Monitoring",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "respiratory gas monitor"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Laboratory storage and thermal equipment",
+        "CommonName": "Specimen warming cabinet",
+        "CanonicalName": "Specimen warming cabinet",
+        "Function": "Laboratory Accessories",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "specimen warming cabinet"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Suction and aspiration systems",
+        "CommonName": "Surgery suction system",
+        "CanonicalName": "Surgery suction system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "surgery suction system"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory containers and disposables",
+        "CommonName": "Test tube rack",
+        "CanonicalName": "Test tube rack",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "test tube rack"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Therapeutic energy systems",
+        "CommonName": "Argon laser",
+        "CanonicalName": "Argon laser",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "argon laser"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory safety cabinets and hoods",
+        "CommonName": "Biosafety cabinet",
+        "CanonicalName": "Biosafety cabinet",
+        "Function": "Laboratory Accessories",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "biosafety cabinet"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Hybridization incubator",
+        "CanonicalName": "Hybridization incubator",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "hybridization incubator"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Injection and infusion supplies",
+        "CommonName": "Intravenous line",
+        "CanonicalName": "Intravenous line",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "intravenous line"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Medical furniture and fixtures",
+        "CommonName": "Surgical light",
+        "CanonicalName": "Surgical light",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "surgical light"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory containers and disposables",
+        "CommonName": "Funnel",
+        "CanonicalName": "Funnel",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "funnel"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Critical care monitoring systems",
+        "CommonName": "Patient monitor",
+        "CanonicalName": "Multiparameter patient monitoring system",
+        "Function": "Surgical and Intensive Care Monitoring",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "monitoring equipment"
+        ],
+        "Keywords": [
+          "monitor",
+          "telemetry",
+          "transducer",
+          "vital signs"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Cardiac diagnostic systems",
+        "CommonName": "ECG machine",
+        "CanonicalName": "Electrocardiography system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "ecg",
+          "ekg",
+          "holter"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Neurophysiology monitoring systems",
+        "CommonName": "EEG machine",
+        "CanonicalName": "Electroencephalography system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "eeg",
+          "electroencephalograph",
+          "photostimulator"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Neurophysiology accessories",
+        "CommonName": "EEG accessory",
+        "CanonicalName": "Electroencephalography accessory",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [
+          "accessories"
+        ],
+        "Keywords": [
+          "electro cap",
+          "electrode positioning",
+          "electrode eeg",
+          "headset egg",
+          "eeg headset"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Anthropometric and clinical measurement tools",
+        "CommonName": "Clinical measuring device",
+        "CanonicalName": "Anthropometric or bedside measuring device",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [
+          "measurement devices"
+        ],
+        "Keywords": [
+          "caliper",
+          "goniometer",
+          "measuring board",
+          "muac",
+          "ruler",
+          "scale",
+          "stadiometer",
+          "stopwatch",
+          "tape measure",
+          "thermometer",
+          "timer",
+          "pedometer"
+        ]
+      },
+      {
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Physiological assessment tools",
+        "CommonName": "Diagnostic monitor",
+        "CanonicalName": "Physiological assessment device",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "tonometer",
+          "audiometer",
+          "bilirubinometer",
+          "spirom",
+          "blood pressure",
+          "stethoscope",
+          "calliper"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Ultrasound systems",
+        "CommonName": "Ultrasound machine",
+        "CanonicalName": "Diagnostic ultrasound system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "ultrasound",
+          "sonograph"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Radiography and fluoroscopy systems",
+        "CommonName": "X-ray machine",
+        "CanonicalName": "Diagnostic radiography or fluoroscopy system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "x ray",
+          "xray",
+          "radiograph",
+          "fluoroscopy",
+          "mammograph"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Advanced imaging systems",
+        "CommonName": "Imaging scanner",
+        "CanonicalName": "Advanced diagnostic imaging system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "ct",
+          "computed tomography",
+          "mri",
+          "magnetic resonance",
+          "gamma camera",
+          "pet",
+          "spect"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Angiography and catheterization imaging systems",
+        "CommonName": "Angiography system",
+        "CanonicalName": "Angiography or catheterization imaging system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "angiography",
+          "catheterization lab",
+          "fluorescein angiography"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Imaging workflow and visualization accessories",
+        "CommonName": "Imaging accessory",
+        "CanonicalName": "Diagnostic imaging accessory or visualization aid",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "contrast injector",
+          "injector, contrast",
+          "negatoscope",
+          "digital storage media",
+          "fiducial marker",
+          "film, dosimetry system"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Ophthalmic imaging systems",
+        "CommonName": "Ophthalmic imaging unit",
+        "CanonicalName": "Ophthalmic diagnostic imaging system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "optical coherence tomography",
+          "oct unit"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Nuclear medicine probes and detectors",
+        "CommonName": "Gamma probe",
+        "CanonicalName": "Nuclear medicine probe or detector",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "gamma probe",
+          "gamma probes"
+        ]
+      },
+      {
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": "Endoscopic visualization systems",
+        "CommonName": "Endoscopic scope",
+        "CanonicalName": "Diagnostic endoscope or endoscopic visualization system",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "endoscope",
+          "bronchoscope",
+          "cystoscope",
+          "colposcope",
+          "laparoscope",
+          "arthroscope",
+          "otoscope",
+          "ophthalmoscope"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory analyzers",
+        "CommonName": "Laboratory analyzer",
+        "CanonicalName": "Clinical laboratory analyzer",
+        "Function": "Analytical Laboratory",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "analyzer",
+          "analyser",
+          "hematology",
+          "chemistry",
+          "blood gas",
+          "pcr"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Rapid diagnostic tests",
+        "CommonName": "Rapid test kit",
+        "CanonicalName": "Rapid diagnostic or point-of-care test",
+        "Function": "Analytical Laboratory",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [
+          "in vitro diagnostic tests"
+        ],
+        "Keywords": [
+          "rdt",
+          "rapid diagnostic test",
+          "rapid test",
+          "point of care",
+          "poc"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory microscopy and pathology equipment",
+        "CommonName": "Laboratory microscope",
+        "CanonicalName": "Microscopy or pathology laboratory device",
+        "Function": "Analytical Laboratory",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "microscope",
+          "histology",
+          "pathology",
+          "stain"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory safety cabinets and hoods",
+        "CommonName": "Lab safety cabinet",
+        "CanonicalName": "Laboratory biosafety cabinet or fume hood",
+        "Function": "Laboratory Accessories",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "biosafety",
+          "fume hood",
+          "grossing bench",
+          "grossing table",
+          "biological hood",
+          "cabinet, biosafety"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory storage and thermal equipment",
+        "CommonName": "Lab freezer or bath",
+        "CanonicalName": "Laboratory thermal control or cold storage device",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "freezer",
+          "plasma thaw",
+          "cryoprecipitate",
+          "water bath",
+          "hot water",
+          "deep freezer",
+          "thawing"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory flow and cell analysis systems",
+        "CommonName": "Flow cytometer",
+        "CanonicalName": "Flow or cell analysis laboratory system",
+        "Function": "Analytical Laboratory",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "flow cytometer",
+          "cell counter",
+          "counting chamber",
+          "haemoglobinometer",
+          "hemoglobinometer",
+          "spectrometer"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Sample preparation and laboratory support",
+        "CommonName": "Lab prep equipment",
+        "CanonicalName": "Laboratory sample preparation and support equipment",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "centrifuge",
+          "incubator",
+          "sample",
+          "specimen",
+          "pipette"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory containers and disposables",
+        "CommonName": "Lab consumable",
+        "CanonicalName": "Laboratory container, filter, or disposable",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "bottle",
+          "filter",
+          "funnel",
+          "applicator sticks",
+          "film, sealing",
+          "test tubes",
+          "paper filter"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "IVD reagents and assays",
+        "CommonName": "IVD reagent",
+        "CanonicalName": "In vitro diagnostic reagent or assay kit",
+        "Function": "Analytical Laboratory",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "reagent",
+          "assay",
+          "ivd",
+          "solution ivd"
+        ]
+      },
+      {
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "General laboratory support equipment",
+        "CommonName": "Laboratory support equipment",
+        "CanonicalName": "General laboratory support equipment",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "laboratory equipment"
+        ],
+        "Keywords": []
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Infusion and medication delivery systems",
+        "CommonName": "Infusion pump",
+        "CanonicalName": "Infusion or syringe pump system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "infusion",
+          "syringe pump"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Defibrillation and resuscitation systems",
+        "CommonName": "Defibrillator",
+        "CanonicalName": "Defibrillation or resuscitation system",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "defibrillator",
+          "resuscitator",
+          "cardioverter"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Cardiac pacing and circulatory support systems",
+        "CommonName": "Cardiac support system",
+        "CanonicalName": "Cardiac pacing or circulatory support system",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "pacemaker",
+          "balloon pump",
+          "aortic pump",
+          "cardiopulmonary bypass",
+          "cardiac ablation",
+          "cable electrode",
+          "lead"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Anesthesia and critical care therapy systems",
+        "CommonName": "Anesthesia machine",
+        "CanonicalName": "Anesthesia or critical care therapy system",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "anaesthesia",
+          "anesthesia",
+          "ventilator",
+          "icu"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Patient warming and cooling systems",
+        "CommonName": "Thermal therapy system",
+        "CanonicalName": "Patient warming or cooling therapy system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "warmer",
+          "cooling mattress",
+          "hypothermia",
+          "blood heater",
+          "fluid warmer",
+          "phototherapy"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Neonatal therapy and support systems",
+        "CommonName": "Neonatal support device",
+        "CanonicalName": "Neonatal therapy or support system",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "newborn",
+          "neonatal",
+          "incubator",
+          "fhr detector",
+          "foetal heart"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Compression and immobilization therapy devices",
+        "CommonName": "Compression therapy device",
+        "CanonicalName": "Compression, immobilization, or support therapy device",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "compression",
+          "binder",
+          "tourniquet",
+          "garment",
+          "calf compression"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Ophthalmic therapy systems",
+        "CommonName": "Ophthalmic treatment device",
+        "CanonicalName": "Ophthalmic therapeutic or procedure system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "corneal topography",
+          "keratometer",
+          "gonioscopy",
+          "pachymeter",
+          "phacoemulsification",
+          "fundus camera",
+          "lensmeter",
+          "optical biometer",
+          "biometer",
+          "prism test",
+          "fusion test"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Neuromuscular and rehabilitation therapy systems",
+        "CommonName": "Therapy device",
+        "CanonicalName": "Neuromuscular or therapeutic support device",
+        "Function": "Physical Therapy and Treatment",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "biofeedback",
+          "electromiography",
+          "emg",
+          "monofilament"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Medication and access therapy consumables",
+        "CommonName": "Therapy access consumable",
+        "CanonicalName": "Therapeutic access or medication delivery consumable",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "closed system drug transfer",
+          "lancet",
+          "filter, leukocyte removal",
+          "enema"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Dialysis and extracorporeal therapy systems",
+        "CommonName": "Dialysis machine",
+        "CanonicalName": "Dialysis or extracorporeal therapy system",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "dialysis",
+          "apheresis",
+          "extracorporeal"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Therapeutic energy systems",
+        "CommonName": "Therapeutic energy system",
+        "CanonicalName": "Electrosurgical or radiotherapy energy system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "electrosurgical",
+          "radiotherapy"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "General therapeutic and life-support devices",
+        "CommonName": "Therapy support equipment",
+        "CanonicalName": "General therapeutic or life-support equipment",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "implantable devices",
+          "medical equipment",
+          "accessories"
+        ],
+        "Keywords": []
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Oxygen supply systems",
+        "CommonName": "Oxygen system",
+        "CanonicalName": "Medical oxygen supply system",
+        "Function": "Life Support",
+        "Risk": "Potential patient death",
+        "SourceTypes": [],
+        "Keywords": [
+          "oxygen",
+          "psa",
+          "concentrator",
+          "flowmeter"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Suction and aspiration systems",
+        "CommonName": "Suction machine",
+        "CanonicalName": "Medical suction or aspiration system",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "suction",
+          "aspirator"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Respiratory masks and interfaces",
+        "CommonName": "Respiratory mask",
+        "CanonicalName": "Respiratory or anesthesia mask/interface",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "mask",
+          "venturi",
+          "manual resuscitator"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Breathing circuits and ventilator accessories",
+        "CommonName": "Ventilation circuit",
+        "CanonicalName": "Breathing circuit or ventilator accessory",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "ventilation circuit",
+          "ventilator set",
+          "peep",
+          "valve assembly"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Airway gas monitoring accessories",
+        "CommonName": "Airway gas accessory",
+        "CanonicalName": "Airway gas monitoring or absorber accessory",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "carbon dioxide absorber",
+          "end tidal co2",
+          "colorimetric"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Medical gas outlets and cylinders",
+        "CommonName": "Medical gas supply",
+        "CanonicalName": "Medical gas outlet, cylinder, or supply item",
+        "Function": "Life Support",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "nitrous oxide",
+          "gas equipment"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Respiratory mouthpieces and adjuncts",
+        "CommonName": "Respiratory adjunct",
+        "CanonicalName": "Respiratory mouthpiece or airway adjunct",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "mouth gag"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Respiratory consumables and materials",
+        "CommonName": "Respiratory consumable",
+        "CanonicalName": "Respiratory gas or airway consumable",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "gas tamponade"
+        ]
+      },
+      {
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Airway and breathing consumables",
+        "CommonName": "Breathing circuit consumable",
+        "CanonicalName": "Airway or breathing circuit consumable",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "airway",
+          "breathing circuit",
+          "cpap",
+          "bipap",
+          "humidifier",
+          "nebul"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Surgical instrument sets",
+        "CommonName": "Surgical instrument set",
+        "CanonicalName": "Reusable surgical instrument set",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "surgical instruments trays and bowls"
+        ],
+        "Keywords": [
+          "surgical instrument",
+          "tray",
+          "bowl",
+          "set"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Reusable surgical hand instruments",
+        "CommonName": "Surgical instrument",
+        "CanonicalName": "Reusable surgical or procedure instrument",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "surgical instruments trays and bowls"
+        ],
+        "Keywords": [
+          "adenotome",
+          "knife",
+          "blade",
+          "chisel",
+          "handle",
+          "forceps",
+          "scissors",
+          "curette",
+          "speculum"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Biopsy and sampling instruments",
+        "CommonName": "Biopsy instrument",
+        "CanonicalName": "Biopsy, aspiration, or sampling instrument",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "biopsy",
+          "bone marrow",
+          "cervical cytology",
+          "aspiration set"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Dilation and access instruments",
+        "CommonName": "Dilating instrument",
+        "CanonicalName": "Dilation, access, or obturation instrument",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "bougie",
+          "dilator",
+          "obturator"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Clinical trays and bowls",
+        "CommonName": "Procedure bowl or tray",
+        "CanonicalName": "Clinical bowl, tray, or sterilization basket",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "bowl",
+          "basket",
+          "tray",
+          "emesis",
+          "dish",
+          "gallipot"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Clamps, clips, and approximators",
+        "CommonName": "Surgical clamp or clip",
+        "CanonicalName": "Surgical clamp, clip, or approximator",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "approximator",
+          "clamp",
+          "clip",
+          "haemoclip",
+          "endoclip",
+          "raney"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Hooks, retractors, and dissectors",
+        "CommonName": "Surgical retractor or dissector",
+        "CanonicalName": "Surgical hook, retractor, or dissector",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "hook",
+          "retractor",
+          "dissector",
+          "spatula"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Powered and fixation instruments",
+        "CommonName": "Surgical drill or driver",
+        "CanonicalName": "Powered surgical or fixation instrument",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "drill",
+          "driver",
+          "screw",
+          "craniotomy",
+          "crosslink",
+          "compressor"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Electrosurgery and stapling accessories",
+        "CommonName": "Electrosurgery accessory",
+        "CanonicalName": "Electrosurgery, clipping, or stapling accessory",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "electrode",
+          "stapler",
+          "cautery"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Drainage and thoracic access devices",
+        "CommonName": "Chest tube kit",
+        "CanonicalName": "Drainage or thoracic access device",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "chest tube",
+          "chest aspiration",
+          "thoracentesis",
+          "paracentesis",
+          "drainage"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Ophthalmic and ENT procedure devices",
+        "CommonName": "ENT or ophthalmic device",
+        "CanonicalName": "ENT or ophthalmic procedure device",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "otoacoustic",
+          "autorefractor",
+          "vitrectomy",
+          "ophthalmic",
+          "ent"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Surgical drapes and gowns",
+        "CommonName": "Surgical drape or gown",
+        "CanonicalName": "Surgical drape, gown, or theatre textile",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "infection prevention and control ipc"
+        ],
+        "Keywords": [
+          "drape",
+          "gown",
+          "cap, surgical"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Procedure support devices",
+        "CommonName": "Procedure room equipment",
+        "CanonicalName": "Surgical or interventional support equipment",
+        "Function": "Additional Physiological Monitoring and Diagnostic",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [
+          "medical equipment"
+        ],
+        "Keywords": [
+          "fundus camera",
+          "ergometer",
+          "cross cylinder",
+          "stress test"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Surgical device accessories",
+        "CommonName": "Surgical accessory",
+        "CanonicalName": "Surgical or interventional device accessory",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "accessories"
+        ],
+        "Keywords": [
+          "hardware accessory",
+          "cautery",
+          "case,",
+          "probe"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Surgical planning and modelling tools",
+        "CommonName": "Foam cutter",
+        "CanonicalName": "Hot-wire foam cutter for clinical modelling",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "hot wire foam",
+          "foam cutter"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "General surgical and interventional instruments",
+        "CommonName": "Surgical instrument",
+        "CanonicalName": "General surgical or interventional instrument",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "surgical instruments trays and bowls",
+          "catheters and related",
+          "oral devices"
+        ],
+        "Keywords": []
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Interventional access devices",
+        "CommonName": "Catheter or cannula",
+        "CanonicalName": "Interventional access device",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "trocar",
+          "catheter",
+          "cannula",
+          "laparoscopy",
+          "access port"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Implants and implantable therapeutic devices",
+        "CommonName": "Implantable device",
+        "CanonicalName": "Implantable surgical or therapeutic device",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient death",
+        "SourceTypes": [
+          "implantable devices"
+        ],
+        "Keywords": [
+          "implant",
+          "pacemaker",
+          "annuloplasty",
+          "septal",
+          "aneurysm clip",
+          "defibrillator implantable"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Reproductive and contraceptive procedure devices",
+        "CommonName": "Contraceptive device",
+        "CanonicalName": "Reproductive or contraceptive procedure device",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "contraception devices"
+        ],
+        "Keywords": [
+          "intra uterine",
+          "iud",
+          "levonorgestrel",
+          "cervical cap"
+        ]
+      },
+      {
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Dental and oral procedure instruments",
+        "CommonName": "Dental instrument",
+        "CanonicalName": "Dental or oral procedure instrument",
+        "Function": "Surgical and Intensive Care",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [
+          "oral devices"
+        ],
+        "Keywords": [
+          "dental",
+          "oral",
+          "root",
+          "burr",
+          "mirror",
+          "elevator"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Mobility and transfer aids",
+        "CommonName": "Mobility aid",
+        "CanonicalName": "Patient mobility or transfer aid",
+        "Function": "Physical Therapy and Treatment",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "wheelchair",
+          "walker",
+          "crutch",
+          "transfer",
+          "lift"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Communication and cognitive support aids",
+        "CommonName": "Communication aid",
+        "CanonicalName": "Assistive communication or cognitive support device",
+        "Function": "Patient Related and Other",
+        "Risk": "No significant identified risk",
+        "SourceTypes": [],
+        "Keywords": [
+          "alarm",
+          "communication",
+          "audiobook",
+          "braille",
+          "screen reader",
+          "speaking",
+          "mobile phone",
+          "personal digital assistant",
+          "orientation board",
+          "watch",
+          "electronic navigation",
+          "gesture to voice"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Vision and hearing assistive aids",
+        "CommonName": "Vision or hearing aid",
+        "CanonicalName": "Assistive vision or hearing product",
+        "Function": "Patient Related and Other",
+        "Risk": "No significant identified risk",
+        "SourceTypes": [],
+        "Keywords": [
+          "contact lens",
+          "spectacle",
+          "prism glasses",
+          "magnifier",
+          "telescope",
+          "headset",
+          "hearing aid",
+          "trial lens",
+          "visual aids"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Orthotic and prosthetic supports",
+        "CommonName": "Orthotic or prosthetic aid",
+        "CanonicalName": "Orthotic, prosthetic, or support aid",
+        "Function": "Physical Therapy and Treatment",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "orthoses",
+          "prostheses",
+          "prosthetic",
+          "stump socks",
+          "off-loading",
+          "ulcer management",
+          "collar",
+          "conformer",
+          "orbital",
+          "hip protector"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Daily living and self-care aids",
+        "CommonName": "Daily living aid",
+        "CanonicalName": "Assistive daily living or self-care aid",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "feeding cup",
+          "straws",
+          "pill organizers",
+          "suppository inserter",
+          "grooming",
+          "grabber",
+          "cup, medicine"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Positioning and pressure relief aids",
+        "CommonName": "Pressure relief aid",
+        "CanonicalName": "Pressure relief or positioning aid",
+        "Function": "Physical Therapy and Treatment",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "pressure relief",
+          "mattress",
+          "cushion",
+          "standing frame"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Environmental accessibility aids",
+        "CommonName": "Accessibility aid",
+        "CanonicalName": "Environmental accessibility or support aid",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "handrail",
+          "ramps",
+          "toilet seat",
+          "seat, shower",
+          "mat, anti-slip",
+          "tricycles"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "General rehabilitation and assistive aids",
+        "CommonName": "Assistive product",
+        "CanonicalName": "General rehabilitation or assistive product",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "medical equipment",
+          "accessories",
+          "implantable devices",
+          "assistive products",
+          "rehabilitation devices",
+          "oral devices"
+        ],
+        "Keywords": []
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Continence and daily living aids",
+        "CommonName": "Continence aid",
+        "CanonicalName": "Continence or daily living assistive product",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "incontinence",
+          "ostomy",
+          "stoma"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Rehabilitation therapy devices",
+        "CommonName": "Rehab device",
+        "CanonicalName": "Rehabilitation therapy device",
+        "Function": "Physical Therapy and Treatment",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "rehabilitation",
+          "physiotherapy",
+          "therapy"
+        ]
+      },
+      {
+        "Type": "Sterilization \u0026 Infection Control Devices",
+        "Family": "Sterilization equipment",
+        "CommonName": "Sterilizer",
+        "CanonicalName": "Sterilization or decontamination equipment",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "autoclave",
+          "steriliz",
+          "washer disinfector",
+          "decontamin"
+        ]
+      },
+      {
+        "Type": "Sterilization \u0026 Infection Control Devices",
+        "Family": "Disinfection and sterilization consumables",
+        "CommonName": "Disinfection chemical",
+        "CanonicalName": "Disinfection or sterilization consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "disinfect",
+          "antimicrobial",
+          "cleaning",
+          "peracetic",
+          "decontaminating solution"
+        ]
+      },
+      {
+        "Type": "Sterilization \u0026 Infection Control Devices",
+        "Family": "Protective barriers and PPE",
+        "CommonName": "Barrier PPE",
+        "CanonicalName": "Protective barrier or PPE item",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "glove",
+          "mask",
+          "gown",
+          "apron",
+          "clogs",
+          "laboratory coat",
+          "cap, surgical",
+          "headwear"
+        ]
+      },
+      {
+        "Type": "Sterilization \u0026 Infection Control Devices",
+        "Family": "Surgical drapes and covers",
+        "CommonName": "Surgical drape",
+        "CanonicalName": "Surgical drape or sterile cover",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "drape, surgical",
+          "shoe cover",
+          "shoe covers",
+          "surgical trousers",
+          "trousers surgical"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Medical furniture and fixtures",
+        "CommonName": "Clinical furniture",
+        "CanonicalName": "Hospital furniture or bedside fixture",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "medical furniture"
+        ],
+        "Keywords": [
+          "bed",
+          "cabinet",
+          "couch",
+          "bedscreen"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Clinical charts and stationery",
+        "CommonName": "Clinical record form",
+        "CanonicalName": "Clinical chart, register, or record form",
+        "Function": "Patient Related and Other",
+        "Risk": "No significant identified risk",
+        "SourceTypes": [
+          "medical charts stationery"
+        ],
+        "Keywords": [
+          "chart",
+          "card",
+          "stationery",
+          "form"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Protective aprons and shields",
+        "CommonName": "Protective apron or shield",
+        "CanonicalName": "Radiation or barrier protection apron or shield",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "personal protective equipment radiation protection equipment"
+        ],
+        "Keywords": [
+          "apron",
+          "shielding",
+          "breast protection",
+          "radiation source handling"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Transport and field support",
+        "CommonName": "Medical transport vehicle",
+        "CanonicalName": "Ambulance or field support vehicle",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [
+          "vehicles"
+        ],
+        "Keywords": [
+          "ambulance",
+          "vehicle"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Waste and environmental control",
+        "CommonName": "Waste management item",
+        "CanonicalName": "Waste or environmental support item",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "waste",
+          "biohazard"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Vector control and environmental health equipment",
+        "CommonName": "Vector control equipment",
+        "CanonicalName": "Vector control or environmental health device",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "vector control equipment"
+        ],
+        "Keywords": [
+          "vector"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Administrative and support equipment",
+        "CommonName": "Operations support equipment",
+        "CanonicalName": "Administrative, IT, or general operations support equipment",
+        "Function": "Computers and Related",
+        "Risk": "No significant identified risk",
+        "SourceTypes": [],
+        "Keywords": [
+          "computer",
+          "printer",
+          "clock",
+          "data logger",
+          "lamp"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Radiation protection and shielding",
+        "CommonName": "Radiation shielding",
+        "CanonicalName": "Radiation protection or shielding device",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "radiation shielding",
+          "shielding",
+          "radiation source handling"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "General non-clinical supplies",
+        "CommonName": "Support supply",
+        "CanonicalName": "General non-clinical support supply",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "non medical devices"
+        ],
+        "Keywords": [
+          "ear cotton",
+          "marker",
+          "loudspeaker",
+          "box cutter"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "General facility and support assets",
+        "CommonName": "Facility support item",
+        "CanonicalName": "General facility, utility, or support asset",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "medical equipment",
+          "personal protective equipment radiation protection equipment",
+          "accessories",
+          "medical charts stationery"
+        ],
+        "Keywords": []
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Calibration and test analyzers",
+        "CommonName": "Biomedical tester",
+        "CanonicalName": "Biomedical test or calibration analyzer",
+        "Function": "Laboratory Accessories",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "calibration",
+          "testing system",
+          "tester",
+          "analyzer",
+          "analyser"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Simulators and training devices",
+        "CommonName": "Training simulator",
+        "CanonicalName": "Simulation or training device",
+        "Function": "Laboratory Accessories",
+        "Risk": "No significant identified risk",
+        "SourceTypes": [],
+        "Keywords": [
+          "simulator",
+          "trainer",
+          "phantom"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Clinical information systems",
+        "CommonName": "Clinical information system",
+        "CanonicalName": "Clinical workflow or information software",
+        "Function": "Computers and Related",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "software",
+          "emr",
+          "ehr",
+          "clinical information system"
+        ]
+      },
+      {
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Imaging and laboratory software",
+        "CommonName": "Diagnostic informatics software",
+        "CanonicalName": "Imaging or laboratory informatics software",
+        "Function": "Computers and Related",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "pacs",
+          "lis",
+          "quality control software",
+          "photoscreener software",
+          "programmer"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Wound care and dressings",
+        "CommonName": "Dressing",
+        "CanonicalName": "Wound care dressing or absorbent supply",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "dressing",
+          "gauze",
+          "bandage",
+          "pad",
+          "swab"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Monitoring and neurodiagnostic accessories",
+        "CommonName": "Monitoring accessory",
+        "CanonicalName": "Monitoring or neurodiagnostic accessory",
+        "Function": "Patient Related and Other",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "electrode",
+          "lead",
+          "patient cable",
+          "eeg",
+          "tens"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Imaging, ophthalmic, and procedural consumables",
+        "CommonName": "Procedure consumable",
+        "CanonicalName": "Imaging, ophthalmic, or procedure consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "gel",
+          "fluorescein",
+          "lens",
+          "phacoemulsification",
+          "ophthalmoscope",
+          "irrigation",
+          "coupling"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Airway and laryngoscopy accessories",
+        "CommonName": "Airway accessory",
+        "CanonicalName": "Airway or laryngoscopy accessory",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "laryngoscope",
+          "airway",
+          "ear tips"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Dialysis and extracorporeal consumables",
+        "CommonName": "Dialysis consumable",
+        "CanonicalName": "Dialysis or extracorporeal therapy consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Potential patient or operator injury",
+        "SourceTypes": [],
+        "Keywords": [
+          "haemodialysis",
+          "hemodialysis",
+          "heat exchanger",
+          "filter, haemodialysis"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Labels, packaging, and handling supplies",
+        "CommonName": "Label or package supply",
+        "CanonicalName": "Label, packaging, or handling consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "label",
+          "carry-bag",
+          "cover",
+          "box"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Injection and infusion supplies",
+        "CommonName": "Injection supply",
+        "CanonicalName": "Injection or infusion consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "syringe",
+          "needle",
+          "infusion set"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Sutures and wound closure supplies",
+        "CommonName": "Suture",
+        "CanonicalName": "Suture or wound closure consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [
+          "sutures"
+        ],
+        "Keywords": [
+          "suture"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Tubes, cannulae, and airway consumables",
+        "CommonName": "Tube or cannula",
+        "CanonicalName": "Tube, cannula, or airway consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "tube",
+          "cannula",
+          "airway"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Collection, drainage, and ostomy supplies",
+        "CommonName": "Drainage or collection bag",
+        "CanonicalName": "Collection, drainage, or ostomy consumable",
+        "Function": "Patient Related and Other",
+        "Risk": "Inappropriate therapy or misdiagnosis",
+        "SourceTypes": [],
+        "Keywords": [
+          "drainage",
+          "collection",
+          "ostomy",
+          "stoma",
+          "bag"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Procedure packs and accessories",
+        "CommonName": "Procedure accessory",
+        "CanonicalName": "Procedure accessory or disposable supply",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "accessory",
+          "procedure",
+          "single use",
+          "pack"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Reproductive health supplies",
+        "CommonName": "Contraceptive device",
+        "CanonicalName": "Reproductive health or contraception supply",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [],
+        "Keywords": [
+          "condom",
+          "diaphragm",
+          "cervical cap",
+          "spermicide"
+        ]
+      },
+      {
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "General device accessories and disposables",
+        "CommonName": "Device accessory",
+        "CanonicalName": "General medical device accessory or disposable",
+        "Function": "Patient Related and Other",
+        "Risk": "Equipment damage",
+        "SourceTypes": [
+          "accessories",
+          "consumables for medical equipment"
+        ],
+        "Keywords": []
+      }
+    ],
+    "specificNameRules": [
+      {
+        "Keywords": [
+          "blood glucose meter point of care"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Blood glucose meter (point-of-care)",
+        "CanonicalName": "Blood glucose meter (point-of-care)",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "point of care pt inr analyzer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Point-of-care pt / inr analyzer",
+        "CanonicalName": "Point-of-care pt / inr analyzer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "in situ hybridization staining platform"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "In situ hybridization staining platform",
+        "CanonicalName": "In situ hybridization staining platform",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "multi syringe contrast media injector"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Multi-syringe contrast media injector",
+        "CanonicalName": "Multi-syringe contrast media injector",
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "cardiac catheterization laboratory system"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Cardiac catheterization laboratory system",
+        "CanonicalName": "Cardiac catheterization laboratory system",
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "co2 blood gas electrode"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "CO2 blood gas electrode",
+        "CanonicalName": "CO2 blood gas electrode",
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "diagnostic instrument monitor card"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Diagnostic instrument monitor card",
+        "CanonicalName": "Diagnostic instrument monitor card",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "extracorporeal membrane oxygenation ecmo"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Extracorporeal membrane oxygenation (ECMO)",
+        "CanonicalName": "Extracorporeal membrane oxygenation (ECMO)",
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "medical label report printer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Medical label / report printer",
+        "CanonicalName": "Medical label / report printer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "mri compatible infusion pump"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "MRI-compatible infusion pump",
+        "CanonicalName": "MRI-compatible infusion pump",
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "mri compatible oxygen canister"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "MRI-compatible oxygen canister",
+        "CanonicalName": "MRI-compatible oxygen canister",
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "next generation sequencing system"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Next generation sequencing system",
+        "CanonicalName": "Next generation sequencing system",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "parenteral enteral solution bag"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Parenteral / enteral solution bag",
+        "CanonicalName": "Parenteral / enteral solution bag",
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "radiation protection apron rack"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Radiation protection apron rack",
+        "CanonicalName": "Radiation protection apron rack",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "rna dna extraction system"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "RNA/DNA extraction system",
+        "CanonicalName": "RNA/DNA extraction system",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "surgical instrument trolley table"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Surgical instrument trolley / table",
+        "CanonicalName": "Surgical instrument trolley / table",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "blood bag scale"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Blood bag scale",
+        "CanonicalName": "Blood bag scale",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "blood collection pipette"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Blood collection pipette",
+        "CanonicalName": "Blood collection pipette",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "capillary blood tube"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Capillary blood tube",
+        "CanonicalName": "Capillary blood tube",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "cell culture tube"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Cell culture tube",
+        "CanonicalName": "Cell culture tube",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "clinical instrument stand"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Clinical instrument stand",
+        "CanonicalName": "Clinical instrument stand",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "cotton applicator sticks"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Cotton applicator sticks",
+        "CanonicalName": "Cotton applicator sticks",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "ct display monitor"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "CT display monitor",
+        "CanonicalName": "CT display monitor",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "diagnostic examination set"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Diagnostic examination set",
+        "CanonicalName": "Diagnostic examination set",
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "dialysis central monitor"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Dialysis central monitor",
+        "CanonicalName": "Dialysis central monitor",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "fiducial marker radiotherapy"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Fiducial marker (radiotherapy)",
+        "CanonicalName": "Fiducial marker (radiotherapy)",
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "fixed surgical light"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Fixed surgical light",
+        "CanonicalName": "Fixed surgical light",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "histology staining rack"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Histology staining rack",
+        "CanonicalName": "Histology staining rack",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "hot air sterilizer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Hot air sterilizer",
+        "CanonicalName": "Hot air sterilizer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "iv infusion pole"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "IV infusion pole",
+        "CanonicalName": "IV infusion pole",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "mobile surgical light"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Mobile surgical light",
+        "CanonicalName": "Mobile surgical light",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "mri equipment cart"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "MRI equipment cart",
+        "CanonicalName": "MRI equipment cart",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "mri positioning footrest"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "MRI positioning footrest",
+        "CanonicalName": "MRI positioning footrest",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "nd yag laser"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Nd: Yag laser",
+        "CanonicalName": "Nd: Yag laser",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "ophthalmic examination table"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Ophthalmic examination table",
+        "CanonicalName": "Ophthalmic examination table",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "ophthalmic instrument stand"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Ophthalmic instrument stand",
+        "CanonicalName": "Ophthalmic instrument stand",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "respiratory gas monitor"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Respiratory gas monitor",
+        "CanonicalName": "Respiratory gas monitor",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "specimen warming cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Specimen warming cabinet",
+        "CanonicalName": "Specimen warming cabinet",
+        "Type": "Consumables \u0026 Accessories",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "surgery suction system"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Surgery suction system",
+        "CanonicalName": "Surgery suction system",
+        "Type": "Diagnostic \u0026 Imaging Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "test tube rack"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Test tube rack",
+        "CanonicalName": "Test tube rack",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "treatment examination table"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Treatment / examination table",
+        "CanonicalName": "Treatment / examination table",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "argon laser"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Argon laser",
+        "CanonicalName": "Argon laser",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "bedside cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Bedside cabinet",
+        "CanonicalName": "Bedside cabinet",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "biosafety cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Biosafety cabinet",
+        "CanonicalName": "Biosafety cabinet",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "cassette printer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Cassette printer",
+        "CanonicalName": "Cassette printer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "cell counter"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Cell counter",
+        "CanonicalName": "Cell counter",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "defibrillator trolley"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Defibrillator trolley",
+        "CanonicalName": "Defibrillator trolley",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "dialysis chair"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Dialysis chair",
+        "CanonicalName": "Dialysis chair",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "hybridization incubator"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Hybridization incubator",
+        "CanonicalName": "Hybridization incubator",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "immunochemistry analyzer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Immunochemistry analyzer",
+        "CanonicalName": "Immunochemistry analyzer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "instrument cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Instrument cabinet",
+        "CanonicalName": "Instrument cabinet",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "instruments trolley"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Instruments trolley",
+        "CanonicalName": "Instruments trolley",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "intravenous line"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Intravenous line",
+        "CanonicalName": "Intravenous line",
+        "Type": "Consumables \u0026 Accessories",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "kick bucket"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Kick bucket",
+        "CanonicalName": "Kick bucket",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "medicine cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Medicine cabinet",
+        "CanonicalName": "Medicine cabinet",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "microscope cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Microscope cabinet",
+        "CanonicalName": "Microscope cabinet",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "storage cabinet"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Storage cabinet",
+        "CanonicalName": "Storage cabinet",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "surgical light"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Surgical light",
+        "CanonicalName": "Surgical light",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "funnel"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Funnel",
+        "CanonicalName": "Funnel",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "spectrophotometer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Spectrophotometer",
+        "CanonicalName": "Spectrophotometer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "cytoflowmeter",
+          "cytoflowmeters"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Flow cytometer",
+        "CanonicalName": "Flow cytometer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Flow and cell analysis systems"
+      },
+      {
+        "Keywords": [
+          "blood flow meter",
+          "blood flow meters"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Blood flow meter",
+        "CanonicalName": "Blood flow meter",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Physiological assessment tools"
+      },
+      {
+        "Keywords": [
+          "nasal cannula",
+          "nasal cannulas"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Oxygen nasal cannula",
+        "CanonicalName": "Oxygen nasal cannula",
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Respiratory masks and interfaces"
+      },
+      {
+        "Keywords": [
+          "clinical chemistry"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Chemistry analyzer",
+        "CanonicalName": "Clinical chemistry analyzer",
+        "Type": "Laboratory \u0026 IVD Equipment",
+        "Family": "Laboratory analyzers"
+      },
+      {
+        "Keywords": [
+          "anaesthesia system",
+          "anesthesia system"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Anesthesia machine",
+        "CanonicalName": "Anesthesia workstation",
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Anesthesia and critical care therapy systems"
+      },
+      {
+        "Keywords": [
+          "ventilator"
+        ],
+        "ExcludeKeywords": [
+          "analyser",
+          "analyzer",
+          "sensor",
+          "set",
+          "circuit",
+          "tubing",
+          "accessory"
+        ],
+        "CommonName": "Ventilator",
+        "CanonicalName": "Mechanical ventilator",
+        "Type": "Treatment, Surgical \u0026 Life Support Devices",
+        "Family": "Anesthesia and critical care therapy systems"
+      },
+      {
+        "Keywords": [
+          "blood glucose meter"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Blood glucose meter",
+        "CanonicalName": "Blood glucose monitoring device",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "foetal monitor",
+          "fetal monitor",
+          "fhr monitor",
+          "foetal heart rate"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Fetal monitor",
+        "CanonicalName": "Fetal monitoring system",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "haemoglobin monitoring",
+          "hemoglobin monitoring"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Hemoglobin monitor",
+        "CanonicalName": "Hemoglobin monitoring device",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": ""
+      },
+      {
+        "Keywords": [
+          "oxygen concentrator"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Oxygen concentrator",
+        "CanonicalName": "Medical oxygen concentrator",
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Oxygen supply systems"
+      },
+      {
+        "Keywords": [
+          "thorpe tube",
+          "medical medicinal gas pipeline systems",
+          "medical gas pipeline",
+          "oxygen flowmeter"
+        ],
+        "ExcludeKeywords": [
+          "cytoflowmeter",
+          "blood flow meter",
+          "nasal cannula"
+        ],
+        "CommonName": "Oxygen flowmeter",
+        "CanonicalName": "Medical oxygen flowmeter",
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Oxygen supply systems"
+      },
+      {
+        "Keywords": [
+          "dialysis solution",
+          "dialysate"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Dialysis solution",
+        "CanonicalName": "Dialysis or dialysate solution",
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Dialysis and extracorporeal consumables"
+      },
+      {
+        "Keywords": [
+          "catheter, suction",
+          "catheter tip, suction",
+          "yankauer"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Suction catheter",
+        "CanonicalName": "Suction catheter or Yankauer tip",
+        "Type": "Consumables \u0026 Accessories",
+        "Family": "Airway and laryngoscopy accessories"
+      },
+      {
+        "Keywords": [
+          "bottle, suction system",
+          "bottle, vacuum, collection"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Suction bottle",
+        "CanonicalName": "Suction collection bottle",
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Suction and aspiration systems"
+      },
+      {
+        "Keywords": [
+          "bulb, suction"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Bulb suction device",
+        "CanonicalName": "Manual bulb suction device",
+        "Type": "Medical Gas \u0026 Respiratory Devices",
+        "Family": "Suction and aspiration systems"
+      },
+      {
+        "Keywords": [
+          "chair, haemodialysis",
+          "chair, hemodialysis"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Dialysis chair",
+        "CanonicalName": "Hemodialysis treatment chair",
+        "Type": "Support Equipment \u0026 Furniture",
+        "Family": "Medical furniture and fixtures"
+      },
+      {
+        "Keywords": [
+          "central monitor, haemodialysis system",
+          "central monitor, hemodialysis system"
+        ],
+        "ExcludeKeywords": [],
+        "CommonName": "Dialysis central monitor",
+        "CanonicalName": "Hemodialysis central monitoring system",
+        "Type": "Monitoring \u0026 Measurement Devices",
+        "Family": "Critical care monitoring systems"
+      }
+    ],
+    "typeDefaults": {
+      "Consumables \u0026 Accessories": {
+        "function": "Patient Related and Other",
+        "risk": "Equipment damage"
+      },
+      "Diagnostic \u0026 Imaging Devices": {
+        "function": "Additional Physiological Monitoring and Diagnostic",
+        "risk": "Inappropriate therapy or misdiagnosis"
+      },
+      "Laboratory \u0026 IVD Equipment": {
+        "function": "Analytical Laboratory",
+        "risk": "Inappropriate therapy or misdiagnosis"
+      },
+      "Medical Gas \u0026 Respiratory Devices": {
+        "function": "Life Support",
+        "risk": "Potential patient or operator injury"
+      },
+      "Monitoring \u0026 Measurement Devices": {
+        "function": "Additional Physiological Monitoring and Diagnostic",
+        "risk": "Inappropriate therapy or misdiagnosis"
+      },
+      "Sterilization \u0026 Infection Control Devices": {
+        "function": "Patient Related and Other",
+        "risk": "Potential patient or operator injury"
+      },
+      "Support Equipment \u0026 Furniture": {
+        "function": "Patient Related and Other",
+        "risk": "Equipment damage"
+      },
+      "Treatment, Surgical \u0026 Life Support Devices": {
+        "function": "Surgical and Intensive Care",
+        "risk": "Potential patient or operator injury"
+      }
+    },
+    "typeByCode": {
+      "BIOMEDICAL_TEST_CALIBRATION_QUALITY_ASSURANCE": "Support Equipment \u0026 Furniture",
+      "CLINICAL_MONITORING_ASSESSMENT": "Monitoring \u0026 Measurement Devices",
+      "CONSUMABLES_ACCESSORIES": "Consumables \u0026 Accessories",
+      "CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES": "Consumables \u0026 Accessories",
+      "DIAGNOSTIC_IMAGING_DEVICES": "Diagnostic \u0026 Imaging Devices",
+      "DIAGNOSTIC_IMAGING_VISUALIZATION": "Diagnostic \u0026 Imaging Devices",
+      "DIGITAL_HEALTH_CLINICAL_SOFTWARE": "Support Equipment \u0026 Furniture",
+      "FACILITY_UTILITY_ENVIRONMENTAL_SUPPORT": "Support Equipment \u0026 Furniture",
+      "INFECTION_PREVENTION_DECONTAMINATION_STERILIZATION": "Sterilization \u0026 Infection Control Devices",
+      "LABORATORY_IN_VITRO_DIAGNOSTICS": "Laboratory \u0026 IVD Equipment",
+      "LABORATORY_IVD_EQUIPMENT": "Laboratory \u0026 IVD Equipment",
+      "MEDICAL_GAS_RESPIRATORY_DEVICES": "Medical Gas \u0026 Respiratory Devices",
+      "MEDICAL_GAS_RESPIRATORY_SUCTION": "Medical Gas \u0026 Respiratory Devices",
+      "MONITORING_MEASUREMENT_DEVICES": "Monitoring \u0026 Measurement Devices",
+      "REHABILITATION_MOBILITY_ASSISTIVE": "Support Equipment \u0026 Furniture",
+      "STERILIZATION_INFECTION_CONTROL_DEVICES": "Sterilization \u0026 Infection Control Devices",
+      "SUPPORT_EQUIPMENT_FURNITURE": "Support Equipment \u0026 Furniture",
+      "SURGICAL_INTERVENTIONAL": "Treatment, Surgical \u0026 Life Support Devices",
+      "THERAPEUTIC_LIFE_SUPPORT": "Treatment, Surgical \u0026 Life Support Devices",
+      "TREATMENT_SURGICAL_LIFE_SUPPORT_DEVICES": "Treatment, Surgical \u0026 Life Support Devices"
+    },
+    "functionByCode": {
+      "ANALYTICAL_LABORATORY": "Analytical Laboratory",
+      "COMPUTERS_AND_IT": "Computers and Related",
+      "CRITICAL_CARE_MONITORING": "Surgical and Intensive Care Monitoring",
+      "GENERAL_PHYSIOLOGICAL_MONITORING": "Additional Physiological Monitoring and Diagnostic",
+      "LABORATORY_ACCESSORIES": "Laboratory Accessories",
+      "LIFE_SUPPORT": "Life Support",
+      "PATIENT_RELATED_OTHER": "Patient Related and Other",
+      "PHYSICAL_THERAPY_TREATMENT": "Physical Therapy and Treatment",
+      "SURGICAL_INTENSIVE_CARE": "Surgical and Intensive Care"
+    },
+    "genericLegacyHeads": [
+      "analyser",
+      "analyzer",
+      "bag",
+      "bottle",
+      "chair",
+      "cup",
+      "device",
+      "filter",
+      "holder",
+      "incubator",
+      "kit",
+      "machine",
+      "mask",
+      "meter",
+      "monitor",
+      "pump",
+      "sensor",
+      "set",
+      "system",
+      "tip",
+      "tray",
+      "unit"
+    ],
+    "legacyDescriptorPhrases": [
+      "adult",
+      "automated",
+      "bedside",
+      "continuous",
+      "disposable",
+      "long life battery",
+      "long-life battery",
+      "manual",
+      "mri safe",
+      "mri-safe",
+      "non invasive",
+      "non-invasive",
+      "portable",
+      "professional use",
+      "reusable",
+      "semi automated",
+      "semi-automated",
+      "single use",
+      "single-use",
+      "sterile"
+    ]
+  }
+}

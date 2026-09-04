@@ -1,6 +1,3 @@
-// Package ontology ports scripts/update_ovahol_ontology.py to Go.
-// Every device_type, device_function, and device_application_risk is validated
-// against the controlled vocabulary so the pipeline stays consistent.
 package ontology
 
 import (
@@ -9,9 +6,11 @@ import (
 )
 
 var nonAlnumRe = regexp.MustCompile(`[^a-z0-9]+`)
+var nonAlnumPreserveCaseRe = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 var parenRe = regexp.MustCompile(`\([^)]*\)`)
 var slashRe = regexp.MustCompile(`/`)
 
+// Normalized converts text to lowercase alphanumeric tokens separated by single spaces.
 func Normalized(text string) string {
 	if text == "" {
 		return ""
@@ -22,6 +21,7 @@ func Normalized(text string) string {
 	return strings.Join(parts, " ")
 }
 
+// HasAny reports whether text contains any of the candidate tokens.
 func HasAny(text string, tokens []string) bool {
 	padded := " " + text + " "
 	for _, token := range tokens {
@@ -42,52 +42,74 @@ func HasAny(text string, tokens []string) bool {
 	return false
 }
 
+// InferFromKeywords infers the device type from keywords under default taxonomy.
 func InferFromKeywords(text string) string {
-	if HasAny(text, []string{"software", "pacs", "electronic medical record", "emr", "ehr", "clinical information system"}) {
-		return TypeByCode["DIGITAL_HEALTH_CLINICAL_SOFTWARE"]
+	return InferFromKeywordsFor(text, nil)
+}
+
+// InferFromKeywordsFor infers the device type from text using the provided taxonomy.
+func InferFromKeywordsFor(text string, tax *Taxonomy) string {
+	if tax == nil {
+		tax = DefaultTaxonomy()
 	}
-	if HasAny(text, []string{"calibration", "quality control", "testing system", "tester", "test equipment", "patient simulator", "simulator", "phantom", "electrical safety"}) {
-		return TypeByCode["BIOMEDICAL_TEST_CALIBRATION_QUALITY_ASSURANCE"]
+	if tax.Inference == nil || len(tax.Inference.TypeByKeyword) == 0 {
+		return ""
 	}
-	if HasAny(text, []string{"ultrasound", "x ray", "xray", "ct ", "computed tomography", "mri", "magnetic resonance", "fluoroscopy", "mammograph", "radiograph", "nuclear medicine", "gamma camera", "endoscope", "bronchoscope", "cystoscope", "colposcope", "laparoscope", "arthroscope", "otoscope", "ophthalmoscope"}) {
-		return TypeByCode["DIAGNOSTIC_IMAGING_VISUALIZATION"]
-	}
-	if HasAny(text, []string{"ivd", "reagent", "assay", "hematology", "chemistry analyzer", "chemistry analyser", "centrifuge", "microscope", "pcr", "blood gas", "laboratory", "specimen", "sample"}) {
-		return TypeByCode["LABORATORY_IN_VITRO_DIAGNOSTICS"]
-	}
-	if HasAny(text, []string{"oxygen", "suction", "airway", "nebul", "flowmeter", "humidifier", "psa", "breathing circuit", "respiratory", "cpap", "bipap", "aspirator"}) {
-		return TypeByCode["MEDICAL_GAS_RESPIRATORY_SUCTION"]
-	}
-	if HasAny(text, []string{"ventilator", "infusion", "syringe pump", "defibrillator", "dialysis", "anaesthesia", "anesthesia", "electrosurgical", "pacemaker", "cardioverter", "apheresis", "resuscitator", "life support"}) {
-		return TypeByCode["THERAPEUTIC_LIFE_SUPPORT"]
-	}
-	if HasAny(text, []string{"monitor", "ecg", "eeg", "tonometer", "audiometer", "spirom", "pulmonary function", "bilirubinometer", "vital signs", "blood pressure", "stethoscope"}) {
-		return TypeByCode["CLINICAL_MONITORING_ASSESSMENT"]
-	}
-	if HasAny(text, []string{"wheelchair", "walker", "crutch", "prosthe", "ortho", "mobility", "assistive", "rehabilitation", "physiotherapy"}) {
-		return TypeByCode["REHABILITATION_MOBILITY_ASSISTIVE"]
-	}
-	if HasAny(text, []string{"steriliz", "autoclave", "disinfect", "decontamin", "ipc", "glove", "mask", "gown", "apron"}) {
-		return TypeByCode["INFECTION_PREVENTION_DECONTAMINATION_STERILIZATION"]
-	}
-	if HasAny(text, []string{"surgical", "instrument", "tray", "trocar", "catheter", "cannula", "implant", "clip", "stent", "laparoscopy", "dental", "oral", "iud", "intra uterine", "intra uterine system", "anoscope", "scope sheath"}) {
-		return TypeByCode["SURGICAL_INTERVENTIONAL"]
-	}
-	if HasAny(text, []string{"dressing", "gauze", "bandage", "pad", "syringe", "needle", "tube", "drainage", "bag", "collection", "accessory", "swab", "suture", "condom", "diaphragm", "cervical cap"}) {
-		return TypeByCode["CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES"]
-	}
-	if HasAny(text, []string{"bed", "cabinet", "ambulance", "vehicle", "chart", "stationery", "waste", "clock", "printer", "data logger", "lamp", "radiation shielding", "shielding"}) {
-		return TypeByCode["FACILITY_UTILITY_ENVIRONMENTAL_SUPPORT"]
+	for _, entry := range tax.Inference.TypeByKeyword {
+		if HasAny(text, entry.Keywords) {
+			if tax.Inference.TypeByCode != nil {
+				if v, ok := tax.Inference.TypeByCode[entry.Type]; ok {
+					return v
+				}
+			}
+			if entry.Type != "" {
+				if v, ok := TypeByCode[entry.Type]; ok {
+					return v
+				}
+				return entry.Type
+			}
+		}
 	}
 	return ""
 }
 
+// IsSupportedSourceType checks if sourceType is recognized under default taxonomy.
 func IsSupportedSourceType(sourceType string) bool {
-	_, ok := SupportedSourceTypes[Normalized(sourceType)]
-	return ok
+	return IsSupportedSourceTypeFor(sourceType, nil)
 }
 
+// IsSupportedSourceTypeFor checks if sourceType is recognized under the given taxonomy.
+func IsSupportedSourceTypeFor(sourceType string, tax *Taxonomy) bool {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	norm := Normalized(sourceType)
+	if tax.Inference != nil && len(tax.Inference.SupportedSourceTypes) > 0 {
+		_, ok := tax.Inference.SupportedSourceTypes[norm]
+		return ok
+	}
+	if tax.Inference != nil && len(tax.Inference.SourceTypeMap) > 0 {
+		_, ok := tax.Inference.SourceTypeMap[norm]
+		return ok
+	}
+	for _, dt := range tax.DeviceTypes {
+		if Normalized(dt.Name) == norm || Normalized(dt.Code) == norm {
+			return true
+		}
+	}
+	return false
+}
+
+// InferDeviceType infers the high-level classification under default taxonomy.
 func InferDeviceType(deviceName, sourceType, emdnTerm string) string {
+	return InferDeviceTypeFor(deviceName, sourceType, emdnTerm, nil)
+}
+
+// InferDeviceTypeFor infers the high-level classification under the given taxonomy.
+func InferDeviceTypeFor(deviceName, sourceType, emdnTerm string, tax *Taxonomy) string {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
 	parts := []string{}
 	if deviceName != "" {
 		parts = append(parts, deviceName)
@@ -100,86 +122,96 @@ func InferDeviceType(deviceName, sourceType, emdnTerm string) string {
 	}
 	text := Normalized(strings.Join(parts, " "))
 	source := Normalized(sourceType)
-	keywordMatch := InferFromKeywords(text)
-	switch source {
-	case "medical equipment":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["THERAPEUTIC_LIFE_SUPPORT"]
-	case "accessories":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES"]
-	case "collection devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES"]
-	case "catheters and related":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES"]
-	case "contraception devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["CONSUMABLES_ACCESSORIES_PROCEDURE_SUPPLIES"]
-	case "endoscopes and related devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["DIAGNOSTIC_IMAGING_VISUALIZATION"]
-	case "implantable devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["SURGICAL_INTERVENTIONAL"]
-	case "measurement devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["CLINICAL_MONITORING_ASSESSMENT"]
-	case "non medical devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["FACILITY_UTILITY_ENVIRONMENTAL_SUPPORT"]
-	case "oral devices":
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["SURGICAL_INTERVENTIONAL"]
-	case "personal protective equipment radiation protection equipment":
-		if HasAny(text, []string{"radiation", "shielding"}) {
-			return TypeByCode["FACILITY_UTILITY_ENVIRONMENTAL_SUPPORT"]
-		}
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["INFECTION_PREVENTION_DECONTAMINATION_STERILIZATION"]
-	case "solutions and reagents":
-		if HasAny(text, []string{"disinfect", "steriliz", "cleaning", "decontamin"}) {
-			return TypeByCode["INFECTION_PREVENTION_DECONTAMINATION_STERILIZATION"]
-		}
-		if keywordMatch != "" {
-			return keywordMatch
-		}
-		return TypeByCode["LABORATORY_IN_VITRO_DIAGNOSTICS"]
-	}
+
+	// 1. Keyword-based matching
+	keywordMatch := InferFromKeywordsFor(text, tax)
 	if keywordMatch != "" {
 		return keywordMatch
 	}
-	if v, ok := DirectSourceTypeMap[source]; ok {
-		return v
+
+	// 2. Direct source type map
+	if tax.Inference != nil && len(tax.Inference.SourceTypeMap) > 0 {
+		if v, ok := tax.Inference.SourceTypeMap[source]; ok {
+			return v
+		}
 	}
+
+	// 3. Direct match in taxonomy DeviceTypes
+	for _, dt := range tax.DeviceTypes {
+		if Normalized(dt.Name) == source || Normalized(dt.Code) == source {
+			return dt.Name
+		}
+	}
+
+	// 4. Match in taxonomy Fields allowed values
+	for _, f := range tax.Fields {
+		if f.Key == FieldDeviceType || f.Required {
+			for _, val := range f.AllowedValues {
+				if Normalized(val) == source {
+					return val
+				}
+			}
+		}
+	}
+
 	return ""
 }
 
+// InferFamilyRule matches a FamilyRule under default taxonomy.
 func InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType string) *FamilyRule {
+	return InferFamilyRuleFor(deviceName, sourceType, emdnTerm, deviceType, nil)
+}
+
+// InferFamilyRuleFor matches a FamilyRule under the given taxonomy.
+func InferFamilyRuleFor(deviceName, sourceType, emdnTerm, deviceType string, tax *Taxonomy) *FamilyRule {
 	if deviceType == "" {
+		return nil
+	}
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	if tax.Inference == nil || len(tax.Inference.FamilyRules) == 0 {
+		return nil
+	}
+	parts := []string{}
+	if deviceName != "" {
+		parts = append(parts, deviceName)
+	}
+	if emdnTerm != "" {
+		parts = append(parts, emdnTerm)
+	}
+	text := Normalized(strings.Join(parts, " "))
+	source := Normalized(sourceType)
+	for i := range tax.Inference.FamilyRules {
+		r := &tax.Inference.FamilyRules[i]
+		if r.Type != deviceType {
+			continue
+		}
+		if len(r.SourceTypes) > 0 && source != "" {
+			if HasAny(source, r.SourceTypes) {
+				return r
+			}
+		}
+		if len(r.Keywords) > 0 && text != "" {
+			if HasAny(text, r.Keywords) {
+				return r
+			}
+		}
+	}
+	return nil
+}
+
+// InferSpecificNameRule matches a SpecificNameRule under default taxonomy.
+func InferSpecificNameRule(deviceName, sourceType, emdnTerm string) *SpecificNameRule {
+	return InferSpecificNameRuleFor(deviceName, sourceType, emdnTerm, nil)
+}
+
+// InferSpecificNameRuleFor matches a SpecificNameRule under the given taxonomy.
+func InferSpecificNameRuleFor(deviceName, sourceType, emdnTerm string, tax *Taxonomy) *SpecificNameRule {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	if tax.Inference == nil || len(tax.Inference.SpecificNameRules) == 0 {
 		return nil
 	}
 	parts := []string{}
@@ -193,18 +225,10 @@ func InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType string) *Famil
 		parts = append(parts, emdnTerm)
 	}
 	text := Normalized(strings.Join(parts, " "))
-	source := Normalized(sourceType)
-	for i := range FamilyRules {
-		r := &FamilyRules[i]
-		if r.Type != deviceType {
+	for i := range tax.Inference.SpecificNameRules {
+		r := &tax.Inference.SpecificNameRules[i]
+		if len(r.ExcludeKeywords) > 0 && HasAny(text, r.ExcludeKeywords) {
 			continue
-		}
-		if source != "" {
-			for _, st := range r.SourceTypes {
-				if Normalized(st) == source {
-					return r
-				}
-			}
 		}
 		if HasAny(text, r.Keywords) {
 			return r
@@ -213,149 +237,211 @@ func InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType string) *Famil
 	return nil
 }
 
-type Defaults struct {
-	Family           string
-	Function         string
-	Risk             string
-	CommonNameHint   string
+// InferredDefaults holds default metadata resolved from inference rules.
+type InferredDefaults struct {
+	Family            string
+	Function          string
+	Risk              string
+	CommonNameHint    string
 	CanonicalNameHint string
 }
 
-func InferDefaults(deviceName, sourceType, emdnTerm, deviceType string) Defaults {
-	if deviceType == "" {
-		return Defaults{}
-	}
-	r := InferFamilyRule(deviceName, sourceType, emdnTerm, deviceType)
-	td, ok := DeviceTypeDefaults[deviceType]
-	if !ok {
-		td = struct{ Function, Risk string }{}
-	}
-	if r != nil {
-		return Defaults{Family: r.Family, Function: r.Function, Risk: r.Risk, CommonNameHint: r.CommonName, CanonicalNameHint: r.CanonicalName}
-	}
-	return Defaults{Function: td.Function, Risk: td.Risk}
+// InferDefaults infers default dimensions under default taxonomy.
+func InferDefaults(deviceName, sourceType, emdnTerm, deviceType string) InferredDefaults {
+	return InferDefaultsFor(deviceName, sourceType, emdnTerm, deviceType, nil)
 }
 
-func CategoryForFunction(name string) string {
-	for _, f := range DeviceFunctions {
-		if f.Name == name {
-			return f.Category
+// InferDefaultsFor infers default dimensions under the given taxonomy.
+func InferDefaultsFor(deviceName, sourceType, emdnTerm, deviceType string, tax *Taxonomy) InferredDefaults {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	var defaults InferredDefaults
+	if tax.Inference != nil && tax.Inference.TypeDefaults != nil {
+		if d, ok := tax.Inference.TypeDefaults[deviceType]; ok {
+			defaults = InferredDefaults{
+				Function: d.Function,
+				Risk:     d.Risk,
+			}
+		}
+	}
+	if rule := InferFamilyRuleFor(deviceName, sourceType, emdnTerm, deviceType, tax); rule != nil {
+		if rule.Family != "" {
+			defaults.Family = rule.Family
+		}
+		if rule.Function != "" {
+			defaults.Function = rule.Function
+		}
+		if rule.Risk != "" {
+			defaults.Risk = rule.Risk
+		}
+		if rule.CommonName != "" {
+			defaults.CommonNameHint = rule.CommonName
+		}
+		if rule.CanonicalName != "" {
+			defaults.CanonicalNameHint = rule.CanonicalName
+		}
+	}
+	return defaults
+}
+
+// CategoryForFunction returns category under default taxonomy.
+func CategoryForFunction(functionName string) string {
+	return CategoryForFunctionFor(functionName, nil)
+}
+
+// CategoryForFunctionFor returns category under the given taxonomy.
+func CategoryForFunctionFor(functionName string, tax *Taxonomy) string {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	for _, fn := range tax.DeviceFunctions {
+		if fn.Name == functionName {
+			return fn.Category
 		}
 	}
 	return ""
 }
 
-func CleanLegacySegment(value string) string {
-	cleaned := parenRe.ReplaceAllString(value, "")
-	cleaned = strings.ReplaceAll(cleaned, "/", " / ")
-	cleaned = strings.Join(strings.Fields(cleaned), " ")
-	cleaned = strings.Trim(cleaned, " ,-/")
-	lowered := strings.ToLower(cleaned)
-	if _, ok := LegacyDescriptorPhrases[lowered]; ok {
-		return ""
-	}
-	// also check exact phrase match (same as above, kept for parity)
-	return cleaned
+// CleanLegacySegment removes descriptor phrases and unit artifacts under default taxonomy.
+func CleanLegacySegment(text string) string {
+	return CleanLegacySegmentFor(text, nil)
 }
 
-func HumanizeName(value string) string {
-	phrase := strings.Join(strings.Fields(value), " ")
-	phrase = strings.TrimSpace(phrase)
-	if phrase == "" {
-		return phrase
+// CleanLegacySegmentFor removes descriptor phrases and unit artifacts under the given taxonomy.
+func CleanLegacySegmentFor(text string, tax *Taxonomy) string {
+	if text == "" {
+		return ""
 	}
-	replacements := map[string]string{
-		"anaesthesia": "anesthesia",
-		"analyser":    "analyzer",
-		"haemodialysis": "hemodialysis",
-		"haemoglobin":   "hemoglobin",
-		"foetal":        "fetal",
+	if tax == nil {
+		tax = DefaultTaxonomy()
 	}
-	lowered := strings.ToLower(phrase)
-	for old, nw := range replacements {
-		lowered = strings.ReplaceAll(lowered, old, nw)
+	var phrases []string
+	if tax.Inference != nil && len(tax.Inference.LegacyDescriptorPhrases) > 0 {
+		phrases = tax.Inference.LegacyDescriptorPhrases
+	} else {
+		for p := range LegacyDescriptorPhrases {
+			phrases = append(phrases, p)
+		}
 	}
-	words := strings.Fields(lowered)
-	acronyms := map[string]bool{"ecg": true, "eeg": true, "iv": true, "mri": true, "aed": true, "cpap": true, "bipap": true, "psa": true, "ent": true, "oct": true, "ivd": true, "it": true}
-	out := []string{}
-	for i, w := range words {
-		if acronyms[w] {
-			out = append(out, strings.ToUpper(w))
-		} else if i == 0 {
-			if len(w) > 0 {
-				out = append(out, strings.ToUpper(w[:1])+w[1:])
-			} else {
-				out = append(out, w)
+	cleaned := text
+	for _, phrase := range phrases {
+		re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(phrase) + `\b`)
+		cleaned = re.ReplaceAllString(cleaned, " ")
+	}
+	cleaned = regexp.MustCompile(`\b\d+(?:[.,]\d+)?\s*(?:mm|cm|m|ml|l|g|kg|v|w|hz|fr|gauge|ch|french|f|kva|kva|mhz|khz)\b`).ReplaceAllString(cleaned, " ")
+	cleaned = regexp.MustCompile(`\b\d+\s*x\s*\d+\b`).ReplaceAllString(cleaned, " ")
+	cleaned = regexp.MustCompile(`\b(?:set|pack|box|pair|kit)\s+of\s+\d+\b`).ReplaceAllString(cleaned, " ")
+	cleaned = regexp.MustCompile(`\b\d+\s*(?:pieces?|pcs?|units?|tests?)\b`).ReplaceAllString(cleaned, " ")
+	cleaned = nonAlnumPreserveCaseRe.ReplaceAllString(cleaned, " ")
+	return strings.Join(strings.Fields(cleaned), " ")
+}
+
+// HumanizeName title-cases text and preserves acronyms under default taxonomy.
+func HumanizeName(text string) string {
+	return HumanizeNameFor(text, nil)
+}
+
+// HumanizeNameFor title-cases text and preserves acronyms under the given taxonomy.
+func HumanizeNameFor(text string, tax *Taxonomy) string {
+	if text == "" {
+		return ""
+	}
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	t := text
+	if tax.Inference != nil && tax.Inference.WordReplacements != nil {
+		for k, v := range tax.Inference.WordReplacements {
+			re := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(k) + `\b`)
+			t = re.ReplaceAllString(t, v)
+		}
+	}
+	words := strings.Fields(t)
+	if len(words) == 0 {
+		return ""
+	}
+	acronymMap := make(map[string]bool)
+	if tax.Inference != nil && len(tax.Inference.Acronyms) > 0 {
+		for _, a := range tax.Inference.Acronyms {
+			acronymMap[strings.ToLower(a)] = true
+		}
+	}
+	loweredWords := []string{"and", "or", "for", "with", "of", "in", "on", "at", "to", "by", "the", "a", "an"}
+	isLowered := func(w string) bool {
+		for _, lw := range loweredWords {
+			if w == lw {
+				return true
 			}
+		}
+		return false
+	}
+	for i, w := range words {
+		lw := strings.ToLower(w)
+		if acronymMap[lw] {
+			words[i] = strings.ToUpper(lw)
+		} else if i > 0 && isLowered(lw) {
+			words[i] = lw
 		} else {
-			out = append(out, w)
+			words[i] = strings.ToUpper(lw[:1]) + lw[1:]
 		}
 	}
-	return strings.Join(out, " ")
+	return strings.Join(words, " ")
 }
 
-func InferSpecificNameRule(deviceName, sourceType, emdnTerm string) *SpecificNameRule {
-	parts := []string{}
-	if deviceName != "" {
-		parts = append(parts, deviceName)
-	}
-	if sourceType != "" {
-		parts = append(parts, sourceType)
-	}
-	if emdnTerm != "" {
-		parts = append(parts, emdnTerm)
-	}
-	text := Normalized(strings.Join(parts, " "))
-	for i := range SpecificNameRules {
-		r := &SpecificNameRules[i]
-		if len(r.Keywords) > 0 && !HasAny(text, r.Keywords) {
-			continue
-		}
-		if len(r.ExcludeKeywords) > 0 && HasAny(text, r.ExcludeKeywords) {
-			continue
-		}
-		return r
-	}
-	return nil
+// InferCommonNameFromLegacy extracts a common name from legacy text under default taxonomy.
+func InferCommonNameFromLegacy(legacySourceName string) string {
+	return InferCommonNameFromLegacyFor(legacySourceName, nil)
 }
 
-func InferCommonNameFromLegacy(deviceName string) string {
-	if deviceName == "" {
+// InferCommonNameFromLegacyFor extracts a common name from legacy text under the given taxonomy.
+func InferCommonNameFromLegacyFor(legacySourceName string, tax *Taxonomy) string {
+	if legacySourceName == "" {
 		return ""
 	}
-	rawParts := strings.Split(deviceName, ",")
-	parts := []string{}
-	for _, p := range rawParts {
-		cleaned := CleanLegacySegment(p)
-		if cleaned != "" {
-			parts = append(parts, cleaned)
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	raw := parenRe.ReplaceAllString(legacySourceName, " ")
+	raw = slashRe.ReplaceAllString(raw, " ")
+	segments := strings.Split(raw, ",")
+	first := CleanLegacySegmentFor(segments[0], tax)
+	if first == "" {
+		for _, seg := range segments[1:] {
+			c := CleanLegacySegmentFor(seg, tax)
+			if c != "" {
+				first = c
+				break
+			}
 		}
 	}
-	if len(parts) == 0 {
+	if first == "" {
 		return ""
 	}
-	if len(parts) == 1 {
-		candidate := HumanizeName(parts[0])
-		wc := len(strings.Fields(candidate))
-		if wc >= 1 && wc <= 5 {
-			return candidate
+	modifiers := []string{}
+	for _, seg := range segments[1:] {
+		c := CleanLegacySegmentFor(seg, tax)
+		if c != "" && len(strings.Fields(c)) <= 2 {
+			modifiers = append(modifiers, c)
 		}
-		return ""
 	}
-	first := parts[0]
-	modifiers := parts[1:]
-	firstTokens := strings.Fields(Normalized(first))
-	head := ""
-	if len(firstTokens) > 0 {
-		head = firstTokens[len(firstTokens)-1]
+	firstWords := strings.Fields(first)
+	head := strings.ToLower(firstWords[len(firstWords)-1])
+
+	heads := GenericLegacyHeads
+	if tax.Inference != nil && len(tax.Inference.GenericLegacyHeads) > 0 {
+		heads = make(map[string]struct{}, len(tax.Inference.GenericLegacyHeads))
+		for _, h := range tax.Inference.GenericLegacyHeads {
+			heads[Normalized(h)] = struct{}{}
+		}
 	}
 	var candidate string
-	if _, ok := GenericLegacyHeads[head]; ok && len(modifiers) > 0 {
+	if _, ok := heads[head]; ok && len(modifiers) > 0 {
 		candidate = strings.Join(append(modifiers, first), " ")
 	} else {
 		candidate = first
 	}
-	candidate = HumanizeName(candidate)
+	candidate = HumanizeNameFor(candidate, tax)
 	wc := len(strings.Fields(candidate))
 	if wc >= 1 && wc <= 6 {
 		return candidate
@@ -363,8 +449,20 @@ func InferCommonNameFromLegacy(deviceName string) string {
 	return ""
 }
 
+// RefineDescriptiveNames refines common and canonical names under default taxonomy.
 func RefineDescriptiveNames(commonName, canonicalName, legacySourceName, emdnTerm string) (string, string) {
+	return RefineDescriptiveNamesFor(commonName, canonicalName, legacySourceName, emdnTerm, nil)
+}
+
+// RefineDescriptiveNamesFor refines common and canonical names under the given taxonomy.
+func RefineDescriptiveNamesFor(commonName, canonicalName, legacySourceName, emdnTerm string, tax *Taxonomy) (string, string) {
 	if commonName == "" {
+		return commonName, canonicalName
+	}
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
+	if tax.Inference == nil || len(tax.Inference.NameRefinementRules) == 0 {
 		return commonName, canonicalName
 	}
 	parts := []string{}
@@ -375,438 +473,101 @@ func RefineDescriptiveNames(commonName, canonicalName, legacySourceName, emdnTer
 		parts = append(parts, emdnTerm)
 	}
 	text := Normalized(strings.Join(parts, " "))
-	apply := func(common string, canonical ...string) (string, string) {
-		c := common
-		c2 := common
-		if len(canonical) > 0 && canonical[0] != "" {
-			c2 = canonical[0]
+
+	for _, r := range tax.Inference.NameRefinementRules {
+		if strings.EqualFold(r.TargetName, commonName) {
+			if len(r.Keywords) == 0 || HasAny(text, r.Keywords) {
+				cName := r.CommonName
+				canName := r.CanonicalName
+				if canName == "" {
+					canName = cName
+				}
+				return cName, canName
+			}
 		}
-		return c, c2
-	}
-	switch commonName {
-	case "Thermometer":
-		if HasAny(text, []string{"non contact", "non-contact", "infrared"}) {
-			return apply("Infrared thermometer")
-		}
-		if HasAny(text, []string{"tympanic", "ear"}) {
-			return apply("Ear thermometer")
-		}
-		if HasAny(text, []string{"digital"}) {
-			return apply("Digital thermometer")
-		}
-		if HasAny(text, []string{"laboratory", "glass"}) {
-			return apply("Laboratory thermometer")
-		}
-		if HasAny(text, []string{"water bath"}) {
-			return apply("Water bath thermometer")
-		}
-		if HasAny(text, []string{"calibrated"}) {
-			return apply("Calibrated thermometer")
-		}
-		return apply("Clinical thermometer")
-	case "Scale":
-		if HasAny(text, []string{"stadiometer", "altimeter", "height"}) {
-			return apply("Height and weight scale")
-		}
-		if HasAny(text, []string{"blood bag", "donor blood", "blood scales"}) {
-			return apply("Blood bag scale")
-		}
-		if HasAny(text, []string{"neonatal", "infant"}) {
-			return apply("Neonatal scale")
-		}
-		if HasAny(text, []string{"analytical"}) {
-			return apply("Analytical balance")
-		}
-		if HasAny(text, []string{"technical"}) {
-			return apply("Technical balance")
-		}
-		if HasAny(text, []string{"beamtype", "beam type", "beam"}) {
-			return apply("Beam balance scale")
-		}
-		if HasAny(text, []string{"digital"}) {
-			return apply("Digital weighing scale")
-		}
-		return apply("Weighing scale")
-	case "Pipette":
-		if HasAny(text, []string{"stand"}) {
-			return apply("Pipette stand")
-		}
-		if HasAny(text, []string{"filler", "wheel run"}) {
-			return apply("Pipette filler")
-		}
-		if HasAny(text, []string{"micropipette"}) {
-			return apply("Micropipette")
-		}
-		if HasAny(text, []string{"serological", "dilution"}) {
-			return apply("Serological pipette")
-		}
-		if HasAny(text, []string{"blood"}) {
-			return apply("Blood pipette")
-		}
-		if HasAny(text, []string{"esr"}) {
-			return apply("ESR pipette")
-		}
-		if HasAny(text, []string{"pasteur"}) {
-			return apply("Pasteur pipette")
-		}
-		if HasAny(text, []string{"digital"}) {
-			return apply("Digital pipette")
-		}
-		if HasAny(text, []string{"automatic"}) {
-			return apply("Automatic pipette")
-		}
-		return apply("Laboratory pipette")
-	case "Tube":
-		if HasAny(text, []string{"capillary", "blood collection"}) {
-			return apply("Capillary blood tube")
-		}
-		if HasAny(text, []string{"oxygen administration", "medical gases"}) {
-			return apply("Oxygen tubing")
-		}
-		if HasAny(text, []string{"pcr"}) {
-			return apply("PCR tube")
-		}
-		if HasAny(text, []string{"microtube", "microvial", "micro tube"}) {
-			return apply("Lab microtube")
-		}
-		if HasAny(text, []string{"centrifuge"}) {
-			return apply("Centrifuge tube")
-		}
-		if HasAny(text, []string{"sample collection", "sample analysis", "sample analyses"}) {
-			return apply("Sample tube")
-		}
-		if HasAny(text, []string{"test tube"}) {
-			return apply("Test tube")
-		}
-		return apply("Laboratory tube")
-	case "Table":
-		if HasAny(text, []string{"operating tables", "operating table"}) {
-			return apply("Operating table")
-		}
-		if HasAny(text, []string{"grossing"}) {
-			return apply("Grossing table")
-		}
-		if HasAny(text, []string{"neonatal resuscitation"}) {
-			return apply("Neonatal resuscitation table")
-		}
-		if HasAny(text, []string{"childbirth", "maternal", "delivery"}) {
-			return apply("Delivery table")
-		}
-		if HasAny(text, []string{"ophthalmology"}) {
-			return apply("Ophthalmic instrument table")
-		}
-		if HasAny(text, []string{"functional exploration", "therapeutic interventions", "surgical instruments"}) {
-			return apply("Instrument table")
-		}
-		return apply("Procedure table")
-	case "Procedure table":
-		if HasAny(text, []string{"examination", "treatment"}) {
-			return apply("Examination table")
-		}
-		if HasAny(text, []string{"slit lamp"}) {
-			return apply("Slit lamp table")
-		}
-		if HasAny(text, []string{"instrument"}) {
-			return apply("Instrument table")
-		}
-		return apply("Procedure table")
-	case "Cabinet":
-		if HasAny(text, []string{"biosafety", "biological hoods", "biological cabinets"}) {
-			return apply("Biosafety cabinet")
-		}
-		if HasAny(text, []string{"warming", "blanket warmer", "contrast media", "fluids heating"}) {
-			return apply("Warming cabinet")
-		}
-		if HasAny(text, []string{"bedside"}) {
-			return apply("Bedside cabinet")
-		}
-		if HasAny(text, []string{"medicines", "emergency medicines", "medicine"}) {
-			return apply("Medicine cabinet")
-		}
-		if HasAny(text, []string{"microscope"}) {
-			return apply("Microscope cabinet")
-		}
-		if HasAny(text, []string{"instrument"}) {
-			return apply("Instrument cabinet")
-		}
-		return apply("Storage cabinet")
-	case "Warming cabinet":
-		if HasAny(text, []string{"blanket warmer"}) {
-			return apply("Blanket warmer")
-		}
-		if HasAny(text, []string{"contrast media"}) {
-			return apply("Contrast media warmer")
-		}
-		return apply("Warming cabinet")
-	case "Rack":
-		if HasAny(text, []string{"test tube"}) {
-			return apply("Test tube rack")
-		}
-		if HasAny(text, []string{"esr", "erythrocyte sedimentation rate"}) {
-			return apply("ESR pipette rack")
-		}
-		if HasAny(text, []string{"radiation shielding apron", "body protection"}) {
-			return apply("Apron rack")
-		}
-		if HasAny(text, []string{"drying"}) {
-			return apply("Drying rack")
-		}
-		if HasAny(text, []string{"retinoscopy lens", "ophthalmic lenses"}) {
-			return apply("Lens rack")
-		}
-		if HasAny(text, []string{"staining"}) {
-			return apply("Staining rack")
-		}
-		return apply("Storage rack")
-	case "Lamp":
-		if HasAny(text, []string{"slit lamp"}) {
-			return apply("Slit lamp")
-		}
-		if HasAny(text, []string{"phototherapy"}) {
-			return apply("Phototherapy lamp")
-		}
-		if HasAny(text, []string{"mobile scialytic", "operating room mobile"}) {
-			return apply("Mobile surgical light")
-		}
-		if HasAny(text, []string{"fixed scialytic", "operating room ceiling"}) {
-			return apply("Fixed surgical light")
-		}
-		if HasAny(text, []string{"scialytic lamp", "operating room", "double single head"}) {
-			return apply("Surgical light")
-		}
-		if HasAny(text, []string{"flashlight"}) {
-			return apply("Medical flashlight")
-		}
-		if HasAny(text, []string{"examination", "light sources"}) {
-			return apply("Examination lamp")
-		}
-		return apply("Medical lamp")
-	case "Ventilator":
-		if HasAny(text, []string{"portable"}) {
-			return apply("Portable ventilator")
-		}
-		if HasAny(text, []string{"neonatal", "paediatric", "pediatric"}) {
-			return apply("Neonatal ventilator")
-		}
-		if HasAny(text, []string{"hospital use"}) {
-			return apply("Hospital ventilator")
-		}
-		return apply("Ventilator", "Mechanical ventilator")
-	case "Ultrasound scanner":
-		if HasAny(text, []string{"bladder volume", "bladder"}) {
-			return apply("Bladder scanner")
-		}
-		if HasAny(text, []string{"cardiology", "cardiovascular", "cardiac"}) {
-			return apply("Cardiac ultrasound machine")
-		}
-		if HasAny(text, []string{"portable"}) {
-			return apply("Portable ultrasound machine")
-		}
-		return apply("Ultrasound machine")
-	case "Oxygen flowmeter":
-		if HasAny(text, []string{"cytoflowmeter", "cytoflowmeters"}) {
-			return apply("Flow cytometer")
-		}
-		if HasAny(text, []string{"blood flow meter", "blood flow meters"}) {
-			return apply("Blood flow meter")
-		}
-		if HasAny(text, []string{"nasal cannula", "nasal cannulas"}) {
-			return apply("Oxygen nasal cannula")
-		}
-		return apply("Oxygen flowmeter")
-	case "Microscope":
-		if HasAny(text, []string{"operative"}) {
-			return apply("Operating microscope")
-		}
-		return apply("Laboratory microscope")
-	case "Refrigerator":
-		if HasAny(text, []string{"blood bank"}) {
-			return apply("Blood bank refrigerator")
-		}
-		return apply("Medical refrigerator")
-	case "Centrifuge":
-		if HasAny(text, []string{"refrigerated"}) {
-			return apply("Refrigerated centrifuge")
-		}
-		return apply("Laboratory centrifuge")
-	case "Laser":
-		if HasAny(text, []string{"photocoagulator"}) {
-			return apply("Laser photocoagulator")
-		}
-		if HasAny(text, []string{"argon", "ophthalmic"}) {
-			return apply("Argon laser")
-		}
-		if HasAny(text, []string{"carbon dioxide", "co2"}) {
-			return apply("CO2 surgical laser")
-		}
-		if HasAny(text, []string{"nd yag", "neodymium"}) {
-			return apply("Nd:YAG laser")
-		}
-		if HasAny(text, []string{"trabeculoplasty"}) {
-			return apply("Trabeculoplasty laser")
-		}
-		return apply("Surgical laser")
-	case "Cart":
-		if HasAny(text, []string{"linen", "laundry", "clean"}) {
-			return apply("Clean linen cart")
-		}
-		if HasAny(text, []string{"linen", "laundry", "soiled"}) {
-			return apply("Soiled linen cart")
-		}
-		if HasAny(text, []string{"mri", "magnetic resonance imaging"}) {
-			return apply("MRI equipment cart")
-		}
-		return apply("Medical cart")
-	case "Trolley":
-		if HasAny(text, []string{"defibrillator"}) {
-			return apply("Defibrillator trolley")
-		}
-		return apply("Medical trolley")
-	case "Bath":
-		if HasAny(text, []string{"plasma thaw"}) {
-			return apply("Plasma thawing bath")
-		}
-		if HasAny(text, []string{"thermostatic water bath"}) {
-			return apply("Water bath")
-		}
-		return apply("Laboratory bath")
-	case "Bed":
-		if HasAny(text, []string{"intensive care", "resuscitation", "icu"}) {
-			return apply("ICU bed")
-		}
-		if HasAny(text, []string{"pediatric"}) {
-			return apply("Pediatric bed")
-		}
-		return apply("Hospital bed")
-	case "Calliper":
-		if HasAny(text, []string{"castroviejo"}) {
-			return apply("Castroviejo caliper")
-		}
-		if HasAny(text, []string{"ophthalmic"}) {
-			return apply("Ophthalmic caliper")
-		}
-		return apply("Measuring caliper")
-	case "Fetal monitor":
-		if HasAny(text, []string{"detector", "doppler"}) {
-			return apply("Fetal Doppler")
-		}
-		if HasAny(text, []string{"continuous", "portable"}) {
-			return apply("Portable fetal monitor")
-		}
-		if HasAny(text, []string{"bedside"}) {
-			return apply("Bedside fetal monitor")
-		}
-		return apply("Fetal monitor")
-	case "Oven":
-		if HasAny(text, []string{"dry air steriliser", "dry air sterilizers", "hot air"}) {
-			return apply("Hot air sterilizer")
-		}
-		if HasAny(text, []string{"microwave"}) {
-			return apply("Laboratory microwave")
-		}
-		return apply("Laboratory oven")
-	case "Stretcher":
-		if HasAny(text, []string{"foldable"}) {
-			return apply("Foldable stretcher")
-		}
-		if HasAny(text, []string{"mri safe", "mri-safe"}) {
-			return apply("MRI-safe stretcher")
-		}
-		return apply("Patient stretcher")
-	case "Warmer":
-		if HasAny(text, []string{"radiant"}) {
-			return apply("Radiant warmer")
-		}
-		if HasAny(text, []string{"heating pad"}) {
-			return apply("Neonatal warming pad")
-		}
-		if HasAny(text, []string{"sleeping bag"}) {
-			return apply("Neonatal warming bag")
-		}
-		return apply("Patient warmer")
-	case "Chemistry analyzer":
-		if HasAny(text, []string{"point of care", "point-of-care", "rapid tests", "poc"}) {
-			return apply("Point-of-care chemistry analyzer")
-		}
-		return apply("Chemistry analyzer", "Clinical chemistry analyzer")
-	case "Laboratory bath":
-		if HasAny(text, []string{"plasma thaw"}) {
-			return apply("Plasma thawing bath")
-		}
-		return apply("Water bath")
-	case "Biometer":
-		if HasAny(text, []string{"pachymeter"}) {
-			return apply("Pachymeter")
-		}
-		if HasAny(text, []string{"optical biometer"}) {
-			return apply("Optical biometer")
-		}
-		return apply("Biometer")
-	case "Amber screw cap bottle":
-		if HasAny(text, []string{"glass bottles"}) {
-			return apply("Amber sample bottle")
-		}
-		return apply("Clinical bottle")
-	case "Bracelet":
-		if HasAny(text, []string{"body temperature monitoring probes"}) {
-			return apply("Temperature monitoring bracelet")
-		}
-		return apply("Patient bracelet")
-	case "Medicine cabinet":
-		if HasAny(text, []string{"emergency"}) {
-			return apply("Emergency medicine cabinet")
-		}
-		return apply("Medicine cabinet")
-	case "Counter":
-		if HasAny(text, []string{"limited panel"}) {
-			return apply("Limited-panel cell counter")
-		}
-		if HasAny(text, []string{"cell counting", "cell counting instruments"}) {
-			return apply("Cell counter")
-		}
-		return apply("Counter")
-	case "Defibrillator":
-		if HasAny(text, []string{"automatic", "aed", "automated external"}) {
-			return apply("AED", "Automated external defibrillator")
-		}
-		return apply("Defibrillator")
 	}
 	return commonName, canonicalName
 }
 
+// ResolvedRow holds intermediate resolution data for a row.
 type ResolvedRow struct {
-	DeviceType            string
-	DeviceCategory        string
-	DeviceFamily          string
-	DeviceFunction        string
+	Fields map[string]string
+
+	// Deprecated: use Fields[FieldDeviceType] or GetField.
+	DeviceType string
+	// Deprecated: use Fields[FieldDeviceCategory].
+	DeviceCategory string
+	// Deprecated: use Fields[FieldDeviceFamily].
+	DeviceFamily string
+	// Deprecated: use Fields[FieldDeviceFunction].
+	DeviceFunction string
+	// Deprecated: use Fields[FieldDeviceApplicationRisk].
 	DeviceApplicationRisk string
-	Name                  string
-	CanonicalName         string
-	CommonNames           []string
-	NamingSource          string
+
+	Name          string
+	CanonicalName string
+	CommonNames   []string
+	NamingSource  string
 }
 
+// GetField returns the taxonomy value for key, checking Fields first then deprecated fixed field.
+func (r ResolvedRow) GetField(key string) string {
+	if r.Fields != nil {
+		if v, ok := r.Fields[key]; ok && v != "" {
+			return v
+		}
+	}
+	switch key {
+	case FieldDeviceType:
+		return r.DeviceType
+	case FieldDeviceCategory:
+		return r.DeviceCategory
+	case FieldDeviceFamily:
+		return r.DeviceFamily
+	case FieldDeviceFunction:
+		return r.DeviceFunction
+	case FieldDeviceApplicationRisk:
+		return r.DeviceApplicationRisk
+	}
+	return ""
+}
+
+// Deprecated accessors (shim) for ResolvedRow.
+func (r ResolvedRow) DeviceTypeAccessor() string     { return r.GetField(FieldDeviceType) }
+func (r ResolvedRow) DeviceFamilyAccessor() string   { return r.GetField(FieldDeviceFamily) }
+func (r ResolvedRow) DeviceFunctionAccessor() string { return r.GetField(FieldDeviceFunction) }
+func (r ResolvedRow) DeviceApplicationRiskAccessor() string {
+	return r.GetField(FieldDeviceApplicationRisk)
+}
+func (r ResolvedRow) DeviceCategoryAccessor() string { return r.GetField(FieldDeviceCategory) }
+
+// ResolveRowNaming resolves names and taxonomy dimensions under default taxonomy.
 func ResolveRowNaming(row map[string]string) ResolvedRow {
+	return ResolveRowNamingFor(row, nil)
+}
+
+// ResolveRowNamingFor resolves names and taxonomy dimensions under the given taxonomy.
+func ResolveRowNamingFor(row map[string]string, tax *Taxonomy) ResolvedRow {
 	legacySourceName := row["Legacy source name"]
 	sourceDeviceType := row["Source device type"]
 	emdnTerm := row["EMDN term"]
-	specificRule := InferSpecificNameRule(legacySourceName, sourceDeviceType, emdnTerm)
-	ovaholType := ""
+
+	specificRule := InferSpecificNameRuleFor(legacySourceName, sourceDeviceType, emdnTerm, tax)
+	inferredType := ""
 	if specificRule != nil && specificRule.Type != "" {
-		ovaholType = specificRule.Type
+		inferredType = specificRule.Type
 	} else {
-		ovaholType = InferDeviceType(legacySourceName, sourceDeviceType, emdnTerm)
+		inferredType = InferDeviceTypeFor(legacySourceName, sourceDeviceType, emdnTerm, tax)
 	}
-	if ovaholType == "" {
-		// No signal from the specific-name rules, source-type mapping, or
-		// device name/EMDN term keyword matching — genuinely unclassifiable,
-		// not merely an unrecognized source type string.
+	if inferredType == "" {
 		return ResolvedRow{NamingSource: "unsupported_source_type"}
 	}
-	defaults := InferDefaults(legacySourceName, sourceDeviceType, emdnTerm, ovaholType)
-	generatedCommon := InferCommonNameFromLegacy(legacySourceName)
+
+	defaults := InferDefaultsFor(legacySourceName, sourceDeviceType, emdnTerm, inferredType, tax)
+	generatedCommon := InferCommonNameFromLegacyFor(legacySourceName, tax)
 	defaultCommon := defaults.CommonNameHint
 	defaultCanonical := defaults.CanonicalNameHint
+
 	namingSource := "family_fallback"
 	commonName := defaultCommon
 	if specificRule != nil && specificRule.CommonName != "" {
@@ -816,6 +577,7 @@ func ResolveRowNaming(row map[string]string) ResolvedRow {
 		commonName = generatedCommon
 		namingSource = "legacy_derived"
 	}
+
 	canonicalName := defaultCanonical
 	if canonicalName == "" {
 		canonicalName = commonName
@@ -825,28 +587,49 @@ func ResolveRowNaming(row map[string]string) ResolvedRow {
 	} else if namingSource == "specific_rule" || namingSource == "legacy_derived" {
 		canonicalName = commonName
 	}
-	commonName, canonicalName = RefineDescriptiveNames(commonName, canonicalName, legacySourceName, emdnTerm)
+
+	commonName, canonicalName = RefineDescriptiveNamesFor(commonName, canonicalName, legacySourceName, emdnTerm, tax)
+
 	family := ""
 	if specificRule != nil && specificRule.Family != "" {
 		family = specificRule.Family
 	} else {
 		family = defaults.Family
 	}
-	category := CategoryForFunction(defaults.Function)
+
+	category := CategoryForFunctionFor(defaults.Function, tax)
+	fields := map[string]string{
+		FieldDeviceType:            inferredType,
+		FieldDeviceCategory:        category,
+		FieldDeviceFamily:          family,
+		FieldDeviceFunction:        defaults.Function,
+		FieldDeviceApplicationRisk: defaults.Risk,
+	}
+
 	return ResolvedRow{
-		DeviceType:            ovaholType,
+		Fields:                fields,
+		DeviceType:            inferredType,
 		DeviceCategory:        category,
 		DeviceFamily:          family,
 		DeviceFunction:        defaults.Function,
 		DeviceApplicationRisk: defaults.Risk,
 		Name:                  commonName,
 		CanonicalName:         canonicalName,
-		CommonNames:           BuildSearchAliases(commonName, canonicalName),
+		CommonNames:           BuildSearchAliasesFor(commonName, canonicalName, tax),
 		NamingSource:          namingSource,
 	}
 }
 
+// BuildSearchAliases builds search aliases under default taxonomy.
 func BuildSearchAliases(commonName, canonicalName string) []string {
+	return BuildSearchAliasesFor(commonName, canonicalName, nil)
+}
+
+// BuildSearchAliasesFor builds search aliases under the given taxonomy.
+func BuildSearchAliasesFor(commonName, canonicalName string, tax *Taxonomy) []string {
+	if tax == nil {
+		tax = DefaultTaxonomy()
+	}
 	values := []string{}
 	add := func(v string) {
 		if v == "" {
@@ -866,237 +649,19 @@ func BuildSearchAliases(commonName, canonicalName string) []string {
 	}
 	add(commonName)
 	add(canonicalName)
-	combined := Normalized(strings.Join([]string{commonName, canonicalName}, " "))
-	if strings.Contains(combined, "electrocardiography") || strings.Contains(combined, "ecg") {
-		add("ECG machine")
-		add("EKG machine")
-		add("Electrocardiograph")
-	}
-	if strings.Contains(combined, "electroencephalography") || strings.Contains(combined, "eeg") {
-		add("EEG machine")
-		add("EEG accessory")
-	}
-	if strings.Contains(combined, "ultrasound") {
-		add("Ultrasound system")
-		add("Sonography system")
-	}
-	if strings.Contains(combined, "patient monitoring") || strings.Contains(combined, "patient monitor") {
-		add("Vital signs monitor")
-	}
-	if strings.Contains(combined, "x ray") || strings.Contains(combined, "radiography") {
-		add("Xray machine")
-		add("Radiography system")
-	}
-	if strings.Contains(combined, "endoscope") || strings.Contains(combined, "endoscopic visualization") {
-		add("Endoscope")
-		add("Endoscopy system")
-		add("Diagnostic scope")
-	}
-	if strings.Contains(combined, "angiography") {
-		add("Cath lab imaging system")
-		add("Angio system")
-	}
-	if strings.Contains(combined, "infusion") && strings.Contains(combined, "pump") {
-		add("IV pump")
-	}
-	if strings.Contains(combined, "defibrillation") || strings.Contains(combined, "defibrillator") {
-		add("AED")
-	}
-	if strings.Contains(combined, "dialysis") {
-		add("Dialysis unit")
-	}
-	if strings.Contains(combined, "electrosurgical or radiotherapy energy system") {
-		add("Therapeutic energy unit")
-		add("Energy therapy system")
-	}
-	if strings.Contains(combined, "oxygen") && strings.Contains(combined, "system") {
-		add("Oxygen equipment")
-	}
-	if strings.Contains(combined, "suction") || strings.Contains(combined, "medical suction") {
-		add("Aspirator")
-	}
-	if strings.Contains(combined, "sterilization") || strings.Contains(combined, "sterilizer") {
-		add("Autoclave")
-	}
-	if strings.Contains(combined, "clinical information software") {
-		add("Clinical system")
-	}
-	if strings.Contains(combined, "clinical workflow or information software") {
-		add("Clinical software")
-		add("Health information system")
-	}
-	if strings.Contains(combined, "imaging or laboratory software") {
-		add("Diagnostic system software")
-	}
-	if strings.Contains(combined, "imaging or laboratory informatics software") {
-		add("Diagnostic software")
-		add("Imaging software")
-		add("Laboratory software")
-	}
-	if strings.Contains(combined, "rapid diagnostic or point of care test") {
-		add("Rapid test")
-		add("RDT")
-		add("Point-of-care test")
-		add("POCT")
-	}
-	if strings.Contains(combined, "clinical laboratory analyzer") {
-		add("Laboratory analyzer")
-		add("Lab analyzer")
-	}
-	if strings.Contains(combined, "general laboratory support") {
-		add("Lab equipment")
-		add("Lab support equipment")
-	}
-	if strings.Contains(combined, "laboratory sample preparation and support equipment") {
-		add("Sample prep equipment")
-		add("Laboratory support equipment")
-	}
-	if strings.Contains(combined, "in vitro diagnostic reagent or assay kit") {
-		add("Diagnostic reagent")
-		add("Assay kit")
-	}
-	if strings.Contains(combined, "biomedical test or calibration analyzer") {
-		add("Calibration tester")
-	}
-	if strings.Contains(combined, "reusable surgical or procedure instrument") {
-		add("Surgical tool")
-		add("Surgical hand instrument")
-	}
-	if strings.Contains(combined, "general surgical or interventional instrument") {
-		add("Procedure instrument")
-		add("Interventional instrument")
-	}
-	if strings.Contains(combined, "general medical device accessory or disposable") {
-		add("Medical consumable")
-		add("Device accessory")
-	}
-	if strings.Contains(combined, "monitoring or neurodiagnostic accessory") {
-		add("Monitoring lead")
-		add("Electrode accessory")
-	}
-	if strings.Contains(combined, "dialysis or extracorporeal therapy consumable") {
-		add("Dialysis set")
-	}
-	if strings.Contains(combined, "drainage or thoracic access device") {
-		add("Chest drain")
-	}
-	if strings.Contains(combined, "airway or laryngoscopy accessory") {
-		add("Laryngoscope accessory")
-	}
-	if strings.Contains(combined, "laboratory biosafety cabinet or fume hood") {
-		add("Biosafety cabinet")
-		add("Fume hood")
-	}
-	if strings.Contains(combined, "laboratory thermal control or cold storage device") {
-		add("Lab freezer")
-		add("Lab bath")
-	}
-	if strings.Contains(combined, "cardiac pacing or circulatory support system") {
-		add("Pacemaker system")
-		add("Circulatory support device")
-	}
-	if strings.Contains(combined, "patient warming or cooling therapy system") {
-		add("Patient warmer")
-		add("Cooling therapy device")
-	}
-	if strings.Contains(combined, "general therapeutic or life support equipment") {
-		add("Therapeutic device")
-		add("Life-support equipment")
-	}
-	if strings.Contains(combined, "neonatal therapy or support system") {
-		add("Neonatal support unit")
-	}
-	if strings.Contains(combined, "compression immobilization or support therapy device") {
-		add("Compression therapy device")
-	}
-	if strings.Contains(combined, "ophthalmic therapeutic or procedure system") {
-		add("Ophthalmic treatment system")
-	}
-	if strings.Contains(combined, "ophthalmic diagnostic imaging system") {
-		add("OCT machine")
-	}
-	if strings.Contains(combined, "assistive communication or cognitive support device") {
-		add("Communication aid")
-	}
-	if strings.Contains(combined, "vision or hearing assistive aid") {
-		add("Sensory aid")
-	}
-	if strings.Contains(combined, "assistive vision or hearing product") {
-		add("Sensory aid")
-		add("Assistive sensory product")
-	}
-	if strings.Contains(combined, "orthotic prosthetic or support aid") {
-		add("Orthotic aid")
-		add("Prosthetic aid")
-	}
-	if strings.Contains(combined, "assistive daily living or self care aid") {
-		add("Daily living aid")
-	}
-	if strings.Contains(combined, "pressure relief or positioning aid") {
-		add("Positioning aid")
-	}
-	if strings.Contains(combined, "environmental accessibility or support aid") {
-		add("Accessibility aid")
-	}
-	if strings.Contains(combined, "clinical chart") || strings.Contains(combined, "record form") || strings.Contains(combined, "register") {
-		add("Growth chart")
-		add("Clinical form")
-	}
-	if strings.Contains(combined, "administrative or general facility support equipment") {
-		add("Support equipment")
-		add("General support equipment")
-	}
-	if strings.Contains(combined, "protective apron barrier or shield") {
-		add("Radiation apron")
-		add("Protective shield")
-	}
-	if strings.Contains(combined, "radiation or barrier protection apron or shield") {
-		add("Protective apron")
-		add("Barrier protection")
-	}
-	if strings.Contains(combined, "respiratory or anesthesia mask interface") {
-		add("Anesthesia mask")
-		add("Respiratory mask")
-	}
-	if strings.Contains(combined, "breathing circuit or ventilator accessory") {
-		add("Breathing circuit")
-		add("Ventilator accessory")
-	}
-	if strings.Contains(combined, "airway or breathing circuit consumable") {
-		add("Airway accessory")
-	}
-	if strings.Contains(combined, "airway gas monitoring or absorber accessory") {
-		add("CO2 detector")
-		add("CO2 absorber")
-	}
-	if strings.Contains(combined, "medical gas outlet cylinder or supply item") {
-		add("Medical gas supply")
-	}
-	if strings.Contains(combined, "surgical drape or sterile cover") {
-		add("Sterile drape")
-	}
-	if strings.Contains(combined, "general facility utility or support asset") {
-		add("Facility support equipment")
-	}
-	if strings.Contains(combined, "hospital furniture or bedside fixture") {
-		add("Hospital furniture")
-		add("Medical furniture")
-	}
-	if strings.Contains(combined, "ambulance or field support vehicle") {
-		add("Transport vehicle")
-		add("Ambulance")
-	}
-	if strings.Contains(combined, "administrative it or general operations support equipment") {
-		add("Administrative support equipment")
-		add("Support equipment")
+
+	if tax.Inference != nil && len(tax.Inference.SearchAliasRules) > 0 {
+		combined := Normalized(strings.Join([]string{commonName, canonicalName}, " "))
+		for _, r := range tax.Inference.SearchAliasRules {
+			if HasAny(combined, r.Keywords) {
+				for _, a := range r.Aliases {
+					add(a)
+				}
+			}
+		}
 	}
 	if len(values) == 0 {
 		return nil
 	}
 	return values
-}
-
-// Deprecated: use InferDeviceType
-func InferOvaholType(deviceName, sourceType, emdnTerm string) string {
-	return InferDeviceType(deviceName, sourceType, emdnTerm)
 }

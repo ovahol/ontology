@@ -75,7 +75,12 @@ var DeviceCategories = []DeviceCategory{
 }
 
 // NamingRule mirrors Python NAMING_RULES
-type NamingRule struct { Field, Rule, GoodExample, Avoid string }
+type NamingRule struct {
+	Field       string `json:"field"`
+	Rule        string `json:"rule"`
+	GoodExample string `json:"goodExample,omitempty"`
+	Avoid       string `json:"avoid,omitempty"`
+}
 
 var NamingRules = []NamingRule{
 {Field: "Common name", Rule: "Use the short term clinicians, nurses, and biomedical teams naturally search for in daily work.", GoodExample: "Patient monitor", Avoid: "Multiparameter physiological surveillance platform"},
@@ -200,14 +205,14 @@ var LegacyDescriptorPhrases = map[string]struct{}{
 
 // FamilyRule defines a device family grouping rule
 type FamilyRule struct {
-Type string
-Family string
-CommonName string
-CanonicalName string
-Function string
-Risk string
-SourceTypes []string
-Keywords []string
+	Type          string   `json:"type"`
+	Family        string   `json:"family"`
+	CommonName    string   `json:"commonName,omitempty"`
+	CanonicalName string   `json:"canonicalName,omitempty"`
+	Function      string   `json:"function,omitempty"`
+	Risk          string   `json:"risk,omitempty"`
+	SourceTypes   []string `json:"sourceTypes,omitempty"`
+	Keywords      []string `json:"keywords,omitempty"`
 }
 
 var FamilyRules = []FamilyRule{
@@ -356,12 +361,12 @@ var FamilyRules = []FamilyRule{
 }
 
 type SpecificNameRule struct {
-Keywords []string
-ExcludeKeywords []string
-CommonName string
-CanonicalName string
-Type string
-Family string
+	Keywords        []string `json:"keywords,omitempty"`
+	ExcludeKeywords []string `json:"excludeKeywords,omitempty"`
+	CommonName      string   `json:"commonName,omitempty"`
+	CanonicalName   string   `json:"canonicalName,omitempty"`
+	Type            string   `json:"type,omitempty"`
+	Family          string   `json:"family,omitempty"`
 }
 
 var SpecificNameRules = []SpecificNameRule{
