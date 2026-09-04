@@ -1,3 +1,4 @@
 *.xlsx
 *.csv
 *.test
+device-records-lifecycle-*.json

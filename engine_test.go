@@ -137,8 +137,10 @@ func TestEngineWithCustomVendorRules(t *testing.T) {
 func TestEngineWithCatalogOverride(t *testing.T) {
 	cat := NewInMemoryCatalog([]CatalogEntry{
 		{
-			Name:       "custom-sensor",
-			DeviceType: "Sensors & Actuators",
+			Name: "custom-sensor",
+			Fields: map[string]string{
+				FieldDeviceType: "Sensors & Actuators",
+			},
 		},
 	})
 

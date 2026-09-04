@@ -1,28 +1,52 @@
 package ontology
 
-import "strings"
+import (
+	"encoding/csv"
+	"io"
+	"strings"
+)
 
-// CatalogEntry is a single known device from the host system's dictionary
-// (e.g. Ovahol's core_public.device). It is the system-agnostic view
-// ontology needs to do exact-match resolution without vendoring the full
-// dictionary into FamilyRules.
+// CatalogEntry is a single known device from a host system's dictionary. It
+// is the system-agnostic view ontology needs for exact-match resolution
+// without vendoring the full dictionary.
 //
-// Values are the same controlled vocabulary as Result: DeviceType maps to
-// lookup.device_type.name, DeviceCategory to lookup.device_category.name,
-// DeviceFunction to lookup.device_function.name, etc.
+// Fields carries the host system's controlled-vocabulary values keyed by
+// whatever dimension keys the vendor uses (the same keys taxonomy.Fields and
+// Result.Fields use). A vendor may use "device_type", "device_function",
+// "device_application_risk", "device_category", or any other set — ontology
+// treats none as special.
+//
+// Name and ID are lookup identity (the canonical dictionary name and an
+// opaque host identifier). EMDNCode/EMDNTerm are standard international
+// device identifiers kept as first-class lookup keys.
 type CatalogEntry struct {
-	Name                  string `json:"name"`
-	DeviceType            string `json:"device_type"`
-	DeviceCategory        string `json:"device_category,omitempty"`
-	DeviceFunction        string `json:"device_function"`
-	DeviceApplicationRisk string `json:"device_application_risk"`
-	EMDNCode              string `json:"emdn_code,omitempty"`
-	EMDNTerm              string `json:"emdn_term,omitempty"`
+	Name   string            `json:"name"`
+	ID     string            `json:"id,omitempty"`
+	Fields map[string]string `json:"fields,omitempty"`
 
-	// ID is opaque — Ovahol can store its device UUID here so the caller
-	// can carry it through without ontology needing to understand it.
-	ID string `json:"id,omitempty"`
+	EMDNCode string `json:"emdn_code,omitempty"`
+	EMDNTerm string `json:"emdn_term,omitempty"`
 }
+
+// GetField returns e.Fields[key], or "" when absent.
+func (e CatalogEntry) GetField(key string) string {
+	if e.Fields == nil {
+		return ""
+	}
+	return e.Fields[key]
+}
+
+// DeviceType returns Fields[FieldDeviceType], if the vendor uses that key.
+func (e CatalogEntry) DeviceType() string { return e.GetField(FieldDeviceType) }
+
+// DeviceCategory returns Fields[FieldDeviceCategory], if the vendor uses that key.
+func (e CatalogEntry) DeviceCategory() string { return e.GetField(FieldDeviceCategory) }
+
+// DeviceFunction returns Fields[FieldDeviceFunction], if the vendor uses that key.
+func (e CatalogEntry) DeviceFunction() string { return e.GetField(FieldDeviceFunction) }
+
+// DeviceApplicationRisk returns Fields[FieldDeviceApplicationRisk], if the vendor uses that key.
+func (e CatalogEntry) DeviceApplicationRisk() string { return e.GetField(FieldDeviceApplicationRisk) }
 
 // Catalog is the host system's read-only device dictionary. Ontology calls
 // Find once per input; if it returns an entry ontology returns it verbatim
@@ -42,11 +66,13 @@ type CatalogEntry struct {
 //	    if err != nil { return nil, false }
 //	    return &ontology.CatalogEntry{
 //	        Name: row.Name,
-//	        DeviceType: row.DeviceTypeName.String,
-//	        DeviceCategory: row.DeviceCategoryName.String, // via device_function→category
-//	        DeviceFunction: row.DeviceFunctionName.String,
-//	        DeviceApplicationRisk: row.DeviceApplicationRisk.String,
-//	        ID: row.ID.String(),
+//	        ID:   row.ID.String(),
+//	        Fields: map[string]string{
+//	            ontology.FieldDeviceType:            row.DeviceTypeName.String,
+//	            ontology.FieldDeviceCategory:        row.DeviceCategoryName.String,
+//	            ontology.FieldDeviceFunction:        row.DeviceFunctionName.String,
+//	            ontology.FieldDeviceApplicationRisk: row.DeviceApplicationRisk.String,
+//	        },
 //	    }, true
 //	}
 //	// then: ontology.NormalizeWithCatalog(input, &dbCatalog{q})
@@ -96,14 +122,18 @@ func (c *InMemoryCatalog) Find(input Input) (*CatalogEntry, bool) {
 	if c == nil || len(c.entries) == 0 {
 		return nil, false
 	}
-	if code := strings.ToLower(Normalized(input.EMDNCode)); code != "" {
-		if idx, ok := c.index["emdn:"+code]; ok {
+	// Prefer the device name: it is the disambiguating key. EMDN codes are
+	// not unique in practice (a single code is shared across several devices
+	// with different type/function/risk), so a name that is present and known
+	// must win over a colliding EMDN code.
+	if dn := strings.ToLower(Normalized(input.DeviceName)); dn != "" {
+		if idx, ok := c.index[dn]; ok {
 			e := c.entries[idx]
 			return &e, true
 		}
 	}
-	if dn := strings.ToLower(Normalized(input.DeviceName)); dn != "" {
-		if idx, ok := c.index[dn]; ok {
+	if code := strings.ToLower(Normalized(input.EMDNCode)); code != "" {
+		if idx, ok := c.index["emdn:"+code]; ok {
 			e := c.entries[idx]
 			return &e, true
 		}
@@ -125,27 +155,33 @@ func NormalizeWithCatalog(input Input, cat Catalog) Result {
 }
 
 // NormalizeWithCatalogAndTaxonomy is the vocab-less catalog entry point.
+// It returns the catalog entry verbatim when matched (MappingSource=
+// "catalog_exact", Confidence="high"); otherwise it falls back to taxonomy
+// inference.
 func NormalizeWithCatalogAndTaxonomy(input Input, cat Catalog, tax *Taxonomy) Result {
 	if cat != nil {
 		if entry, ok := cat.Find(input); ok && entry != nil {
-			category := entry.DeviceCategory
-			if category == "" {
-				category = CategoryForFunction(entry.DeviceFunction)
+			// Start from the catalog's own fields (any vendor dimensions),
+			// then fill the Ovahol-style deprecated fixed fields if present.
+			fields := make(map[string]string, len(entry.Fields)+1)
+			for k, v := range entry.Fields {
+				fields[k] = v
 			}
-			fields := map[string]string{
-				FieldDeviceType:            entry.DeviceType,
-				FieldDeviceCategory:        category,
-				FieldDeviceFunction:        entry.DeviceFunction,
-				FieldDeviceApplicationRisk: entry.DeviceApplicationRisk,
+			// Derive category from function via the taxonomy rules (a generic
+			// function->category derivation) when the entry did not carry it.
+			if fields[FieldDeviceCategory] == "" {
+				if cat := CategoryForFunctionFor(entry.DeviceFunction(), tax); cat != "" {
+					fields[FieldDeviceCategory] = cat
+				}
 			}
 			return Result{
 				Name:                  entry.Name,
 				Fields:                fields,
-				DeviceType:            entry.DeviceType,
-				DeviceCategory:        category,
-				DeviceFunction:        entry.DeviceFunction,
-				DeviceApplication:     entry.DeviceFunction,
-				DeviceApplicationRisk: entry.DeviceApplicationRisk,
+				DeviceType:            fields[FieldDeviceType],
+				DeviceCategory:        fields[FieldDeviceCategory],
+				DeviceFunction:        fields[FieldDeviceFunction],
+				DeviceApplication:     fields[FieldDeviceFunction],
+				DeviceApplicationRisk: fields[FieldDeviceApplicationRisk],
 				LegacySourceName:      input.DeviceName,
 				SourceType:            input.SourceType,
 				EMDNCode:              firstNonEmpty(input.EMDNCode, entry.EMDNCode),
@@ -179,4 +215,76 @@ func firstNonEmpty(a, b string) string {
 		return a
 	}
 	return b
+}
+
+// CSVCatalog is a catalog loaded from a device dictionary CSV. The host
+// system maps its own column names onto fields, keeping ontology
+// system-agnostic while letting a migrator replay its dictionary exactly.
+//
+// Columns maps the value to read for each key of interest -> the CSV column
+// header that holds it. Three special keys are lookup identity and are stored
+// on the entry directly: "name" (required), "id", and "emdn_code"/"emdn_term".
+// Every other key is a controlled-vocabulary dimension and is stored in
+// CatalogEntry.Fields under that same key — so a vendor using
+// "device_type"/"device_function"/... reads naturally, and any other
+// dimension key works too.
+type CSVCatalog struct {
+	Columns map[string]string
+}
+
+// Load builds an InMemoryCatalog from the CSV reader using the column-name
+// mapping described on CSVCatalog.
+func (c CSVCatalog) Load(r io.Reader) (*InMemoryCatalog, error) {
+	crd := csv.NewReader(r)
+	crd.FieldsPerRecord = -1
+	recs, err := crd.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if len(recs) == 0 {
+		return &InMemoryCatalog{index: map[string]int{}}, nil
+	}
+	header := map[string]int{}
+	for i, h := range recs[0] {
+		header[strings.TrimSpace(h)] = i
+	}
+	val := func(rec []string, field string) string {
+		hdr, ok := c.Columns[field]
+		if !ok {
+			return ""
+		}
+		i, ok := header[hdr]
+		if !ok || i >= len(rec) {
+			return ""
+		}
+		return strings.TrimSpace(rec[i])
+	}
+	var entries []CatalogEntry
+	for _, rec := range recs[1:] {
+		name := val(rec, "name")
+		if name == "" {
+			continue
+		}
+		entry := CatalogEntry{
+			Name:     name,
+			ID:       val(rec, "id"),
+			EMDNCode: val(rec, "emdn_code"),
+			EMDNTerm: val(rec, "emdn_term"),
+		}
+		// Every non-special key becomes a Fields dimension.
+		for key := range c.Columns {
+			switch key {
+			case "name", "id", "emdn_code", "emdn_term":
+				continue
+			}
+			if v := val(rec, key); v != "" {
+				if entry.Fields == nil {
+					entry.Fields = map[string]string{}
+				}
+				entry.Fields[key] = v
+			}
+		}
+		entries = append(entries, entry)
+	}
+	return NewInMemoryCatalog(entries), nil
 }
