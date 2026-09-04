@@ -80,15 +80,16 @@ func main() {
 		// not invent dimensions the catalog lacks). Ovahol's own function->
 		// category vocabulary is a vendor concern, so the ovahol layer derives
 		// it explicitly here when the dictionary row did not carry it.
-		category := result.DeviceCategory
-		if category == "" && strings.TrimSpace(result.DeviceFunction) != "" {
-			category = ontology.CategoryForFunctionFor(result.DeviceFunction, tax)
+		category := result.GetField(ontology.FieldDeviceCategory)
+		function := result.GetField(ontology.FieldDeviceFunction)
+		if category == "" && strings.TrimSpace(function) != "" {
+			category = ontology.CategoryForFunctionFor(function, tax)
 		}
 		rec := ApplyUnknownConventions(result.Name, c.model, c.brand, c.mfr, result.EMDNCode, result.EMDNTerm)
-		rec.DeviceType = result.DeviceType
+		rec.DeviceType = result.GetField(ontology.FieldDeviceType)
 		rec.DeviceCategory = category
-		rec.DeviceFunction = result.DeviceFunction
-		rec.ApplicationRisk = result.DeviceApplicationRisk
+		rec.DeviceFunction = function
+		rec.ApplicationRisk = result.GetField(ontology.FieldDeviceApplicationRisk)
 		rec.MappingSource = result.MappingSource
 		rec.Confidence = result.Confidence
 		fmt.Println("------------------------------------------------------------")

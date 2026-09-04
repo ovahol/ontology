@@ -121,14 +121,14 @@ func TestCompatibility_NormalizeOutputIsOvaholValid(t *testing.T) {
 			t.Errorf("Normalize(%+v) returned invalid (confidence=%s, source=%s) — sample should be valid", in, result.Confidence, result.MappingSource)
 			continue
 		}
-		if !validTypes[result.DeviceType] {
-			t.Errorf("Normalize(%+v).DeviceType %q invalid", in, result.DeviceType)
+		if !validTypes[result.GetField(FieldDeviceType)] {
+			t.Errorf("Normalize(%+v).DeviceType %q invalid", in, result.GetField(FieldDeviceType))
 		}
-		if !validFuncs[result.DeviceFunction] {
-			t.Errorf("Normalize(%+v).DeviceFunction %q invalid", in, result.DeviceFunction)
+		if !validFuncs[result.GetField(FieldDeviceFunction)] {
+			t.Errorf("Normalize(%+v).DeviceFunction %q invalid", in, result.GetField(FieldDeviceFunction))
 		}
-		if !validRisks[result.DeviceApplicationRisk] {
-			t.Errorf("Normalize(%+v).DeviceApplicationRisk %q invalid", in, result.DeviceApplicationRisk)
+		if !validRisks[result.GetField(FieldDeviceApplicationRisk)] {
+			t.Errorf("Normalize(%+v).DeviceApplicationRisk %q invalid", in, result.GetField(FieldDeviceApplicationRisk))
 		}
 		if result.Name == "" {
 			t.Errorf("Normalize(%+v) empty Name", in)
@@ -160,8 +160,8 @@ func TestCompatibility_NormalizeNeverLeaksFreeText(t *testing.T) {
 			t.Errorf("Normalize(%+v) unexpectedly invalid", in)
 			continue
 		}
-		if !validTypes[result.DeviceType] {
-			t.Errorf("Normalize(%+v) leaked free text into DeviceType: %q", in, result.DeviceType)
+		if !validTypes[result.GetField(FieldDeviceType)] {
+			t.Errorf("Normalize(%+v) leaked free text into DeviceType: %q", in, result.GetField(FieldDeviceType))
 		}
 		// Controlled fields must be valid, but Name may retain descriptive tokens
 		if result.Name == "" {
@@ -195,33 +195,8 @@ func TestCompatibility_JSONInterchangeRoundTrips(t *testing.T) {
 		t.Fatalf("round-trip length mismatch: %d vs %d", len(decoded), len(results))
 	}
 	for i, r := range decoded {
-		if r.DeviceType != results[i].DeviceType {
-			t.Errorf("round-trip [%d] DeviceType mismatch: %q vs %q", i, r.DeviceType, results[i].DeviceType)
-		}
-	}
-}
-
-func TestCompatibility_CSVAndAPIImportHeaders(t *testing.T) {
-	wantSheetHeaders := []string{
-		"Name", "Device type", "Device category", "Device function",
-		"Device application risk", "Legacy source name", "Source device type",
-		"EMDN code", "EMDN term",
-	}
-	if len(DefaultDeviceSheetHeaders) != len(wantSheetHeaders) {
-		t.Fatalf("DefaultDeviceSheetHeaders length %d, want %d", len(DefaultDeviceSheetHeaders), len(wantSheetHeaders))
-	}
-	for i, want := range wantSheetHeaders {
-		if DefaultDeviceSheetHeaders[i] != want {
-			t.Errorf("DefaultDeviceSheetHeaders[%d] = %q, want %q", i, DefaultDeviceSheetHeaders[i], want)
-		}
-	}
-	wantAPIHeaders := []string{"name", "device_type", "device_category", "device_function", "device_application_risk", "emdn_code", "emdn_term"}
-	if len(DefaultAPIImportHeaders) != len(wantAPIHeaders) {
-		t.Fatalf("DefaultAPIImportHeaders length %d, want %d", len(DefaultAPIImportHeaders), len(wantAPIHeaders))
-	}
-	for i, want := range wantAPIHeaders {
-		if DefaultAPIImportHeaders[i] != want {
-			t.Errorf("DefaultAPIImportHeaders[%d] = %q, want %q", i, DefaultAPIImportHeaders[i], want)
+		if r.GetField(FieldDeviceType) != results[i].GetField(FieldDeviceType) {
+			t.Errorf("round-trip [%d] DeviceType mismatch: %q vs %q", i, r.GetField(FieldDeviceType), results[i].GetField(FieldDeviceType))
 		}
 	}
 }
@@ -241,14 +216,14 @@ func TestCompatibility_ToAPIImportRecordsAreValid(t *testing.T) {
 	validFuncs := allowedSet(tax, FieldDeviceFunction)
 	validRisks := allowedSet(tax, FieldDeviceApplicationRisk)
 	for _, rec := range records {
-		if !validTypes[rec.DeviceType] {
-			t.Errorf("APIImportRecord %q has invalid device_type %q", rec.Name, rec.DeviceType)
+		if !validTypes[rec.GetField(FieldDeviceType)] {
+			t.Errorf("APIImportRecord %q has invalid device_type %q", rec.Name, rec.GetField(FieldDeviceType))
 		}
-		if !validFuncs[rec.DeviceFunction] {
-			t.Errorf("APIImportRecord %q has invalid device_function %q", rec.Name, rec.DeviceFunction)
+		if !validFuncs[rec.GetField(FieldDeviceFunction)] {
+			t.Errorf("APIImportRecord %q has invalid device_function %q", rec.Name, rec.GetField(FieldDeviceFunction))
 		}
-		if !validRisks[rec.DeviceApplicationRisk] {
-			t.Errorf("APIImportRecord %q has invalid device_application_risk %q", rec.Name, rec.DeviceApplicationRisk)
+		if !validRisks[rec.GetField(FieldDeviceApplicationRisk)] {
+			t.Errorf("APIImportRecord %q has invalid device_application_risk %q", rec.Name, rec.GetField(FieldDeviceApplicationRisk))
 		}
 		if rec.Name == "" {
 			t.Error("APIImportRecord has empty name")

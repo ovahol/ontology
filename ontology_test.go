@@ -50,8 +50,8 @@ func TestNormalize(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			result := NormalizeWithTaxonomy(tc.in, tax)
-			if result.DeviceType != tc.want {
-				t.Errorf("Normalize(%+v) DeviceType = %q, want %q (full result: %+v)", tc.in, result.DeviceType, tc.want, result)
+			if got := result.GetField(FieldDeviceType); got != tc.want {
+				t.Errorf("Normalize(%+v) device_type = %q, want %q (full result: %+v)", tc.in, got, tc.want, result)
 			}
 			if tc.want == "" && result.IsValid() {
 				t.Errorf("expected invalid result for unsupported source type, got valid: %+v", result)
@@ -83,9 +83,9 @@ func TestNormalizeWithMedevisDefault(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := Normalize(tc.in)
-			if result.DeviceType != tc.want {
-				t.Errorf("Normalize(%+v) DeviceType = %q, want %q", tc.in, result.DeviceType, tc.want)
+			result := NormalizeWithTaxonomy(tc.in, nil)
+			if got := result.GetField(FieldDeviceType); got != tc.want {
+				t.Errorf("Normalize(%+v) device_type = %q, want %q", tc.in, got, tc.want)
 			}
 		})
 	}
@@ -125,8 +125,8 @@ func TestNormalizeJSON(t *testing.T) {
 	if len(results) != 1 {
 		t.Fatalf("expected 1 result, got %d", len(results))
 	}
-	if results[0].DeviceType != "Monitoring & Measurement Devices" {
-		t.Errorf("unexpected type: %q", results[0].DeviceType)
+	if got := results[0].GetField(FieldDeviceType); got != "Monitoring & Measurement Devices" {
+		t.Errorf("unexpected type: %q", got)
 	}
 }
 
@@ -188,56 +188,47 @@ func TestAgnosticJSONFields(t *testing.T) {
 	if r.Name == "" {
 		t.Error("expected non-empty Name")
 	}
-	if r.DeviceType == "" {
-		t.Error("expected non-empty DeviceType")
+	if r.GetField(FieldDeviceType) == "" {
+		t.Error("expected non-empty device_type")
 	}
-	if r.DeviceCategory == "" {
-		t.Error("expected non-empty DeviceCategory")
+	if r.GetField(FieldDeviceCategory) == "" {
+		t.Error("expected non-empty device_category")
 	}
-	if r.DeviceFunction == "" {
-		t.Error("expected non-empty DeviceFunction")
+	if r.GetField(FieldDeviceFunction) == "" {
+		t.Error("expected non-empty device_function")
 	}
 	// Ensure legacy top-level keys not present, streamlined keys present.
-	// Golden-file migration: new "fields" map carries pluggable dimensions including device_family,
-	// so we only reject legacy top-level keys (ovahol_*, common_name, canonical_name, search_aliases)
-	// not the presence of device_family inside fields.
+	// The pluggable "fields" map carries the dimensions, so we only reject
+	// legacy top-level keys (ovahol_*, common_name, canonical_name,
+	// search_aliases), not the presence of device_family inside fields.
 	data, _ := ToJSON([]Result{r})
 	s := string(data)
 	if contains(s, "\"ovahol_device_type\"") || contains(s, "\"ovahol_device_family\"") || contains(s, "\"common_name\"") || contains(s, "\"canonical_name\"") || contains(s, "\"search_aliases\"") {
 		t.Errorf("JSON still contains legacy top-level keys: %s", s)
 	}
-	if !contains(s, "\"name\"") || !contains(s, "\"device_type\"") || !contains(s, "\"device_category\"") || !contains(s, "\"device_function\"") || !contains(s, "\"device_application_risk\"") {
+	if !contains(s, "\"name\"") || !contains(s, FieldDeviceType) || !contains(s, FieldDeviceCategory) || !contains(s, FieldDeviceFunction) || !contains(s, FieldDeviceApplicationRisk) {
 		t.Errorf("JSON missing streamlined keys: %s", s)
 	}
-	// Pluggable Fields shim must be present and mirrored to deprecated accessors.
+	// Pluggable Fields map is the sole storage.
 	if r.Fields == nil {
-		t.Error("expected non-nil Fields map (pluggable shim)")
+		t.Error("expected non-nil Fields map (pluggable storage)")
 	}
-	if r.Fields[FieldDeviceType] != r.DeviceType {
-		t.Errorf("Fields[device_type] %q != DeviceType %q (shim sync)", r.Fields[FieldDeviceType], r.DeviceType)
-	}
-	if r.GetField(FieldDeviceType) != r.DeviceType {
-		t.Errorf("GetField mismatch")
-	}
-	if r.DeviceTypeAccessor() != r.DeviceType {
-		t.Errorf("deprecated accessor mismatch")
+	if r.GetField(FieldDeviceType) != r.Fields[FieldDeviceType] {
+		t.Errorf("GetField/Fields mismatch for device_type")
 	}
 }
 
 func TestStreamlinedFields(t *testing.T) {
 	tax, _ := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
 	r := NormalizeWithTaxonomy(Input{DeviceName: "Infusion pump", SourceType: "infusion devices"}, tax)
-	if r.DeviceType != "Treatment, Surgical & Life Support Devices" {
-		t.Errorf("unexpected DeviceType: %q", r.DeviceType)
+	if r.GetField(FieldDeviceType) != "Treatment, Surgical & Life Support Devices" {
+		t.Errorf("unexpected device_type: %q", r.GetField(FieldDeviceType))
 	}
-	if r.DeviceCategory != "Therapeutic" {
-		t.Errorf("expected Therapeutic category, got %q", r.DeviceCategory)
+	if r.GetField(FieldDeviceCategory) != "Therapeutic" {
+		t.Errorf("expected Therapeutic category, got %q", r.GetField(FieldDeviceCategory))
 	}
-	if r.DeviceFunction == "" || r.DeviceApplicationRisk == "" {
-		t.Errorf("expected function/risk, got %q / %q", r.DeviceFunction, r.DeviceApplicationRisk)
-	}
-	if r.DeviceApplication != r.DeviceFunction {
-		t.Errorf("DeviceApplication alias mismatch: %q vs %q", r.DeviceApplication, r.DeviceFunction)
+	if r.GetField(FieldDeviceFunction) == "" || r.GetField(FieldDeviceApplicationRisk) == "" {
+		t.Errorf("expected function/risk, got %q / %q", r.GetField(FieldDeviceFunction), r.GetField(FieldDeviceApplicationRisk))
 	}
 }
 

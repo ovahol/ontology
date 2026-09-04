@@ -9,31 +9,23 @@ import (
 	"strings"
 )
 
-// Normalize is the primary interchange entry point. It takes one raw device
-// record from any external system and returns the canonical system-agnostic
-// record. This is the function any migrator calls per row.
+// NormalizeWithTaxonomy is the single-record entry point: it takes one raw
+// device record from any external system and returns the canonical system-
+// agnostic result. Vendors supply their own taxonomy (LoadTaxonomyFile); a nil
+// tax falls back to the embedded default.
 //
 // Example:
 //
-//	result := ontology.Normalize(ontology.Input{
+//	result := ontology.NormalizeWithTaxonomy(ontology.Input{
 //	    DeviceName: "Catheter, sterile, single-use, adult",
 //	    SourceType: "catheters and related",
 //	    EMDNTerm:   "Peripheral venous catheters",
-//	}, taxonomy)
+//	}, tax)
 //	// result.IsValid() == true
 //	// result.Name == "Peripheral intravenous catheter" (or similar)
-//	// result.DeviceType == "Consumables & Accessories"
+//	// result.Fields[ontology.FieldDeviceType] == "Consumables & Accessories"
 //
-// Deprecated: use NormalizeWithTaxonomy. This wrapper requires a taxonomy
-// but keeps the old signature for migration — it loads taxonomy from the
-// deprecated CurrentTaxonomy stub and panics if no vocab is available.
-// Prefer NormalizeWithTaxonomy.
-func Normalize(in Input) Result {
-	return NormalizeWithTaxonomy(in, nil)
-}
-
-// NormalizeWithTaxonomy is the vocab-less entry point. Vendors must supply
-// their own taxonomy (LoadTaxonomyFile). ontology no longer ships a vocab.
+// This is the function any migrator calls per row.
 func NormalizeWithTaxonomy(in Input, tax *Taxonomy) Result {
 	row := map[string]string{
 		"Legacy source name": in.DeviceName,
@@ -46,48 +38,19 @@ func NormalizeWithTaxonomy(in Input, tax *Taxonomy) Result {
 	// Derive confidence
 	confidence := confidenceFor(resolved)
 
-	// Build pluggable Fields map (forward-compatible) and mirror to deprecated fixed fields.
-	fields := make(map[string]string)
-	if resolved.Fields != nil {
-		for k, v := range resolved.Fields {
-			fields[k] = v
-		}
-	}
-	// Ensure fixed dimensions are represented even if ResolveRowNaming didn't populate Fields (unsupported case).
-	if len(fields) == 0 && resolved.NamingSource != "unsupported_source_type" {
-		if resolved.DeviceType != "" {
-			fields[FieldDeviceType] = resolved.DeviceType
-		}
-		if resolved.DeviceCategory != "" {
-			fields[FieldDeviceCategory] = resolved.DeviceCategory
-		}
-		if resolved.DeviceFunction != "" {
-			fields[FieldDeviceFunction] = resolved.DeviceFunction
-		}
-		if resolved.DeviceApplicationRisk != "" {
-			fields[FieldDeviceApplicationRisk] = resolved.DeviceApplicationRisk
-		}
-		if resolved.DeviceFamily != "" {
-			fields[FieldDeviceFamily] = resolved.DeviceFamily
-		}
-	}
+	fields := resolved.Fields
 	if len(fields) == 0 {
 		fields = nil
 	}
 	return Result{
-		Name:                  resolved.Name,
-		Fields:                fields,
-		DeviceType:            resolved.GetField(FieldDeviceType),
-		DeviceCategory:        resolved.GetField(FieldDeviceCategory),
-		DeviceFunction:        resolved.GetField(FieldDeviceFunction),
-		DeviceApplication:     resolved.GetField(FieldDeviceFunction),
-		DeviceApplicationRisk: resolved.GetField(FieldDeviceApplicationRisk),
-		LegacySourceName:      in.DeviceName,
-		SourceType:            in.SourceType,
-		EMDNCode:              in.EMDNCode,
-		EMDNTerm:              in.EMDNTerm,
-		MappingSource:         resolved.NamingSource,
-		Confidence:            confidence,
+		Name:             resolved.Name,
+		Fields:           fields,
+		LegacySourceName: in.DeviceName,
+		SourceType:       in.SourceType,
+		EMDNCode:         in.EMDNCode,
+		EMDNTerm:         in.EMDNTerm,
+		MappingSource:    resolved.NamingSource,
+		Confidence:       confidence,
 	}
 }
 
@@ -98,12 +61,12 @@ func confidenceFor(r ResolvedRow) string {
 	case "specific_rule":
 		return "high"
 	case "legacy_derived":
-		if r.DeviceCategory != "" {
+		if r.GetField(FieldDeviceCategory) != "" {
 			return "high"
 		}
 		return "medium"
 	case "family_fallback":
-		if r.DeviceCategory != "" {
+		if r.GetField(FieldDeviceCategory) != "" {
 			return "medium"
 		}
 		return "low"
@@ -112,16 +75,9 @@ func confidenceFor(r ResolvedRow) string {
 	}
 }
 
-// NormalizeBatch normalizes a slice of inputs, preserving order.
+// NormalizeBatchWithTaxonomy normalizes a slice of inputs, preserving order.
 // Invalid results (unsupported source type) are included with Confidence "none"
 // so the caller can decide how to handle them — filter, report, or override.
-//
-// Deprecated: use NormalizeBatchWithTaxonomy.
-func NormalizeBatch(inputs []Input) []Result {
-	return NormalizeBatchWithTaxonomy(inputs, nil)
-}
-
-// NormalizeBatchWithTaxonomy is the vocab-less batch entry point.
 func NormalizeBatchWithTaxonomy(inputs []Input, tax *Taxonomy) []Result {
 	out := make([]Result, 0, len(inputs))
 	for _, in := range inputs {
@@ -130,22 +86,16 @@ func NormalizeBatchWithTaxonomy(inputs []Input, tax *Taxonomy) []Result {
 	return out
 }
 
-// NormalizeJSON reads a JSON array of Input objects and returns normalized Results.
-// Input JSON uses the same snake_case field names as Input's json tags.
+// NormalizeJSONWithTaxonomy reads a JSON array (or single object) of Input
+// objects and returns normalized Results. Input JSON uses the same snake_case
+// field names as Input's json tags.
 //
-// Example input file:
+// Example input:
 //
 //	[
 //	  {"device_name": "ECG machine", "source_type": "monitoring equipment"},
 //	  {"device_name": "Infusion pump", "source_type": "infusion devices"}
 //	]
-//
-// Deprecated: use NormalizeJSONWithTaxonomy.
-func NormalizeJSON(data []byte) ([]Result, error) {
-	return NormalizeJSONWithTaxonomy(data, nil)
-}
-
-// NormalizeJSONWithTaxonomy is the vocab-less JSON entry point.
 func NormalizeJSONWithTaxonomy(data []byte, tax *Taxonomy) ([]Result, error) {
 	var inputs []Input
 	if err := json.Unmarshal(data, &inputs); err != nil {
@@ -159,14 +109,8 @@ func NormalizeJSONWithTaxonomy(data []byte, tax *Taxonomy) ([]Result, error) {
 	return NormalizeBatchWithTaxonomy(inputs, tax), nil
 }
 
-// NormalizeJSONFile reads a JSON file of Input objects and returns Results.
-//
-// Deprecated: use NormalizeJSONFileWithTaxonomy.
-func NormalizeJSONFile(path string) ([]Result, error) {
-	return NormalizeJSONFileWithTaxonomy(path, nil)
-}
-
-// NormalizeJSONFileWithTaxonomy is the vocab-less file entry point.
+// NormalizeJSONFileWithTaxonomy reads a JSON file of Input objects and returns
+// normalized Results.
 func NormalizeJSONFileWithTaxonomy(path string, tax *Taxonomy) ([]Result, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -180,25 +124,40 @@ func ToJSON(results []Result) ([]byte, error) {
 	return json.MarshalIndent(results, "", "  ")
 }
 
-// ToCSV writes results to CSV using the interchange column order.
-// Returns the CSV bytes.
+// ToCSV writes results to CSV. Columns are taxonomy-driven: Name, then one
+// column per resolved Fields key (sorted), then the input echo and
+// diagnostics. The first row's field set defines the columns; missing values
+// are written as empty cells.
 func ToCSV(results []Result) ([]byte, error) {
+	fieldKeys := make(map[string]struct{})
+	for _, r := range results {
+		for k := range r.Fields {
+			fieldKeys[k] = struct{}{}
+		}
+	}
+	keys := make([]string, 0, len(fieldKeys))
+	for k := range fieldKeys {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	headers := []string{"Name"}
+	headers = append(headers, keys...)
+	headers = append(headers, "Legacy source name", "Source device type",
+		"EMDN code", "EMDN term", "Mapping source", "Confidence")
+
 	var buf strings.Builder
 	w := csv.NewWriter(&buf)
-	headers := []string{
-		"Name", "Device type", "Device category", "Device function",
-		"Device application risk", "Legacy source name", "Source device type",
-		"EMDN code", "EMDN term", "Mapping source", "Confidence",
-	}
 	if err := w.Write(headers); err != nil {
 		return nil, err
 	}
 	for _, r := range results {
-		row := []string{
-			r.Name, r.DeviceType, r.DeviceCategory, r.DeviceFunction, r.DeviceApplicationRisk,
-			r.LegacySourceName, r.SourceType, r.EMDNCode, r.EMDNTerm,
-			r.MappingSource, r.Confidence,
+		row := []string{r.Name}
+		for _, k := range keys {
+			row = append(row, r.Fields[k])
 		}
+		row = append(row, r.LegacySourceName, r.SourceType, r.EMDNCode, r.EMDNTerm,
+			r.MappingSource, r.Confidence)
 		if err := w.Write(row); err != nil {
 			return nil, err
 		}
@@ -211,11 +170,10 @@ func ToCSV(results []Result) ([]byte, error) {
 }
 
 // ToAPIImportRecords deduplicates Results into API-ready import records.
-// Only valid results (IsValid() == true) are included. Deduplication key is
-// generalized from the old hardcoded 4-field join to include any pluggable
-// Fields entries (sorted) via APIImportRecord.DedupKey(). This keeps dedup
-// stable for the 4 fixed dimensions while automatically incorporating custom
-// dimensions without code changes.
+// Only valid results (IsValid() == true) are included. Deduplication is driven
+// by APIImportRecord.DedupKey(), which joins the name with every resolved
+// Fields entry (sorted by key), so any taxonomy dimensions participate in
+// deduplication without code changes.
 func ToAPIImportRecords(results []Result) []APIImportRecord {
 	seen := make(map[string]struct{})
 	var out []APIImportRecord
@@ -236,7 +194,7 @@ func ToAPIImportRecords(results []Result) []APIImportRecord {
 		if out[i].Name != out[j].Name {
 			return out[i].Name < out[j].Name
 		}
-		return out[i].DeviceType < out[j].DeviceType
+		return out[i].DedupKey() < out[j].DedupKey()
 	})
 	return out
 }

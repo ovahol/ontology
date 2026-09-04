@@ -372,55 +372,20 @@ func RefineDescriptiveNamesFor(commonName, canonicalName, legacySourceName, emdn
 
 // ResolvedRow holds intermediate resolution data for a row.
 type ResolvedRow struct {
-	Fields map[string]string
-
-	// Deprecated: use Fields[FieldDeviceType] or GetField.
-	DeviceType string
-	// Deprecated: use Fields[FieldDeviceCategory].
-	DeviceCategory string
-	// Deprecated: use Fields[FieldDeviceFamily].
-	DeviceFamily string
-	// Deprecated: use Fields[FieldDeviceFunction].
-	DeviceFunction string
-	// Deprecated: use Fields[FieldDeviceApplicationRisk].
-	DeviceApplicationRisk string
-
+	Fields        map[string]string
 	Name          string
 	CanonicalName string
 	CommonNames   []string
 	NamingSource  string
 }
 
-// GetField returns the taxonomy value for key, checking Fields first then deprecated fixed field.
+// GetField returns the taxonomy value for key from Fields.
 func (r ResolvedRow) GetField(key string) string {
-	if r.Fields != nil {
-		if v, ok := r.Fields[key]; ok && v != "" {
-			return v
-		}
+	if r.Fields == nil {
+		return ""
 	}
-	switch key {
-	case FieldDeviceType:
-		return r.DeviceType
-	case FieldDeviceCategory:
-		return r.DeviceCategory
-	case FieldDeviceFamily:
-		return r.DeviceFamily
-	case FieldDeviceFunction:
-		return r.DeviceFunction
-	case FieldDeviceApplicationRisk:
-		return r.DeviceApplicationRisk
-	}
-	return ""
+	return r.Fields[key]
 }
-
-// Deprecated accessors (shim) for ResolvedRow.
-func (r ResolvedRow) DeviceTypeAccessor() string     { return r.GetField(FieldDeviceType) }
-func (r ResolvedRow) DeviceFamilyAccessor() string   { return r.GetField(FieldDeviceFamily) }
-func (r ResolvedRow) DeviceFunctionAccessor() string { return r.GetField(FieldDeviceFunction) }
-func (r ResolvedRow) DeviceApplicationRiskAccessor() string {
-	return r.GetField(FieldDeviceApplicationRisk)
-}
-func (r ResolvedRow) DeviceCategoryAccessor() string { return r.GetField(FieldDeviceCategory) }
 
 // requiredFieldsResolved reports whether every field the taxonomy marks
 // Required has a non-empty value in fields. If the taxonomy declares no
@@ -486,16 +451,11 @@ func ResolveRowNamingFor(row map[string]string, tax *Taxonomy) ResolvedRow {
 	commonName, canonicalName = RefineDescriptiveNamesFor(commonName, canonicalName, legacySourceName, emdnTerm, tax)
 
 	return ResolvedRow{
-		Fields:                fields,
-		DeviceType:            fields[FieldDeviceType],
-		DeviceCategory:        fields[FieldDeviceCategory],
-		DeviceFamily:          fields[FieldDeviceFamily],
-		DeviceFunction:        fields[FieldDeviceFunction],
-		DeviceApplicationRisk: fields[FieldDeviceApplicationRisk],
-		Name:                  commonName,
-		CanonicalName:         canonicalName,
-		CommonNames:           BuildSearchAliasesFor(commonName, canonicalName, tax),
-		NamingSource:          namingSource,
+		Fields:        fields,
+		Name:          commonName,
+		CanonicalName: canonicalName,
+		CommonNames:   BuildSearchAliasesFor(commonName, canonicalName, tax),
+		NamingSource:  namingSource,
 	}
 }
 

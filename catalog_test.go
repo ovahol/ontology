@@ -21,11 +21,11 @@ func TestCatalogExactMatch(t *testing.T) {
 	})
 
 	// exact hit — should bypass taxonomy, return catalog verbatim
-	r := NormalizeWithCatalog(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, cat)
+	r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "ECG machine", SourceType: "monitoring equipment"}, cat, nil)
 	if r.MappingSource != "catalog_exact" {
 		t.Fatalf("expected catalog_exact, got %q", r.MappingSource)
 	}
-	if r.Name != "ECG machine" || r.DeviceType != "Monitoring & Measurement Devices" {
+	if r.Name != "ECG machine" || r.GetField(FieldDeviceType) != "Monitoring & Measurement Devices" {
 		t.Errorf("unexpected catalog result: %+v", r)
 	}
 	if r.Confidence != "high" {
@@ -34,13 +34,13 @@ func TestCatalogExactMatch(t *testing.T) {
 	// EMDN code match already covers alias via normalized name
 	// now alias via common EMDN is primary
 	// EMDN code match
-	r3 := NormalizeWithCatalog(Input{EMDNCode: " Z1201 "}, NewInMemoryCatalog([]CatalogEntry{
+	r3 := NormalizeWithCatalogAndTaxonomy(Input{EMDNCode: " Z1201 "}, NewInMemoryCatalog([]CatalogEntry{
 		{Name: "Infusion pump", EMDNCode: "Z1201", Fields: map[string]string{
 			"device_type":             "Treatment, Surgical & Life Support Devices",
 			"device_function":         "Surgical and Intensive Care",
 			"device_application_risk": "Potential patient or operator injury",
 		}},
-	}))
+	}), nil)
 	if r3.MappingSource != "catalog_exact" {
 		t.Fatalf("expected catalog hit via EMDN, got %q", r3.MappingSource)
 	}
@@ -63,7 +63,7 @@ func TestCatalogFallback(t *testing.T) {
 	if r.MappingSource == "catalog_exact" {
 		t.Fatalf("expected taxonomy fallback, got catalog_exact")
 	}
-	if r.DeviceType != "Treatment, Surgical & Life Support Devices" {
+	if r.GetField(FieldDeviceType) != "Treatment, Surgical & Life Support Devices" {
 		t.Errorf("fallback inference wrong: %+v", r)
 	}
 	// nil catalog → always taxonomy
@@ -82,8 +82,8 @@ func TestCatalogUnsupportedSourceBypass(t *testing.T) {
 			"device_application_risk": "Equipment damage",
 		}},
 	})
-	r := NormalizeWithCatalog(Input{DeviceName: "Weird Widget", SourceType: "unknown category xyz"}, cat)
-	if r.MappingSource != "catalog_exact" || r.DeviceType != "Consumables & Accessories" {
+	r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "Weird Widget", SourceType: "unknown category xyz"}, cat, nil)
+	if r.MappingSource != "catalog_exact" || r.GetField(FieldDeviceType) != "Consumables & Accessories" {
 		t.Fatalf("catalog should bypass unsupported_source_type: %+v", r)
 	}
 }
@@ -109,12 +109,12 @@ ECG machine,"Monitoring & Measurement Devices","Additional Physiological Monitor
 	if cat == nil || len(cat.entries) != 2 {
 		t.Fatalf("expected 2 catalog entries, got %d", len(cat.entries))
 	}
-	r := NormalizeWithCatalog(Input{DeviceName: "Infusion pump"}, cat)
-	if r.MappingSource != "catalog_exact" || r.DeviceType != "Treatment, Surgical & Life Support Devices" {
+	r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "Infusion pump"}, cat, nil)
+	if r.MappingSource != "catalog_exact" || r.GetField(FieldDeviceType) != "Treatment, Surgical & Life Support Devices" {
 		t.Fatalf("catalog load reconcile failed: %+v", r)
 	}
 	// EMDN code lookup on a loaded entry.
-	r2 := NormalizeWithCatalog(Input{EMDNCode: "Z11010101"}, cat)
+	r2 := NormalizeWithCatalogAndTaxonomy(Input{EMDNCode: "Z11010101"}, cat, nil)
 	if r2.MappingSource != "catalog_exact" || r2.Name != "ECG machine" {
 		t.Fatalf("EMDN lookup via loaded catalog failed: %+v", r2)
 	}
@@ -157,10 +157,10 @@ func TestDictionaryReconciliation(t *testing.T) {
 	results := NormalizeBatchWithCatalogAndTaxonomy(batch, cat, tax)
 	for i, e := range dictionary {
 		r := results[i]
-		if r.DeviceType != e.DeviceType() || r.DeviceFunction != e.DeviceFunction() || r.DeviceApplicationRisk != e.DeviceApplicationRisk() {
+		if r.GetField(FieldDeviceType) != e.GetField(FieldDeviceType) || r.GetField(FieldDeviceFunction) != e.GetField(FieldDeviceFunction) || r.GetField(FieldDeviceApplicationRisk) != e.GetField(FieldDeviceApplicationRisk) {
 			t.Errorf("[catalog] %q -> (%s|%s|%s), want (%s|%s|%s)",
-				e.Name, r.DeviceType, r.DeviceFunction, r.DeviceApplicationRisk,
-				e.DeviceType(), e.DeviceFunction(), e.DeviceApplicationRisk())
+				e.Name, r.GetField(FieldDeviceType), r.GetField(FieldDeviceFunction), r.GetField(FieldDeviceApplicationRisk),
+				e.GetField(FieldDeviceType), e.GetField(FieldDeviceFunction), e.GetField(FieldDeviceApplicationRisk))
 		}
 		if r.MappingSource != "catalog_exact" {
 			t.Errorf("[catalog] %q mapping source %q, want catalog_exact", e.Name, r.MappingSource)
@@ -172,10 +172,10 @@ func TestDictionaryReconciliation(t *testing.T) {
 	rulesResults := NormalizeBatchWithTaxonomy(batch, tax)
 	for i, e := range dictionary {
 		r := rulesResults[i]
-		if r.DeviceType != e.DeviceType() || r.DeviceFunction != e.DeviceFunction() || r.DeviceApplicationRisk != e.DeviceApplicationRisk() {
+		if r.GetField(FieldDeviceType) != e.GetField(FieldDeviceType) || r.GetField(FieldDeviceFunction) != e.GetField(FieldDeviceFunction) || r.GetField(FieldDeviceApplicationRisk) != e.GetField(FieldDeviceApplicationRisk) {
 			t.Errorf("[rules] %q -> (%s|%s|%s), want (%s|%s|%s)",
-				e.Name, r.DeviceType, r.DeviceFunction, r.DeviceApplicationRisk,
-				e.DeviceType(), e.DeviceFunction(), e.DeviceApplicationRisk())
+				e.Name, r.GetField(FieldDeviceType), r.GetField(FieldDeviceFunction), r.GetField(FieldDeviceApplicationRisk),
+				e.GetField(FieldDeviceType), e.GetField(FieldDeviceFunction), e.GetField(FieldDeviceApplicationRisk))
 		}
 	}
 }
@@ -195,8 +195,8 @@ func TestCatalogPrefersNameOverCollidingEMDN(t *testing.T) {
 			"device_application_risk": "Equipment damage",
 		}},
 	})
-	r := NormalizeWithCatalog(Input{DeviceName: "Infusion pump", EMDNCode: "Z1203"}, cat)
-	if r.Name != "Infusion pump" || r.DeviceType != "Treatment, Surgical & Life Support Devices" {
+	r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "Infusion pump", EMDNCode: "Z1203"}, cat, nil)
+	if r.Name != "Infusion pump" || r.GetField(FieldDeviceType) != "Treatment, Surgical & Life Support Devices" {
 		t.Fatalf("name should win over colliding EMDN, got: %+v", r)
 	}
 }
@@ -226,11 +226,11 @@ func TestCatalogFuzzyMatch(t *testing.T) {
 		wantName string
 		wantType string
 	}{
-		{"Multiparametric basic patient moniter", "Multiparametric basic patient monitor", "Monitoring & Measurement Devices"},   // transposed letter
-		{"Infusion pumpp", "Infusion pump", "Treatment, Surgical & Life Support Devices"},                                        // extra char
+		{"Multiparametric basic patient moniter", "Multiparametric basic patient monitor", "Monitoring & Measurement Devices"}, // transposed letter
+		{"Infusion pumpp", "Infusion pump", "Treatment, Surgical & Life Support Devices"},                                      // extra char
 	}
 	for _, tc := range cases {
-		r := NormalizeWithCatalog(Input{DeviceName: tc.query}, cat)
+		r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: tc.query}, cat, nil)
 		if r.MappingSource != "catalog_fuzzy" {
 			t.Errorf("query %q: source=%q, want catalog_fuzzy (got %+v)", tc.query, r.MappingSource, r)
 			continue
@@ -238,8 +238,8 @@ func TestCatalogFuzzyMatch(t *testing.T) {
 		if r.Confidence != "medium" {
 			t.Errorf("query %q: confidence=%q, want medium", tc.query, r.Confidence)
 		}
-		if r.Name != tc.wantName || r.DeviceType != tc.wantType {
-			t.Errorf("query %q: matched (%s|%s), want (%s|%s)", tc.query, r.Name, r.DeviceType, tc.wantName, tc.wantType)
+		if r.Name != tc.wantName || r.GetField(FieldDeviceType) != tc.wantType {
+			t.Errorf("query %q: matched (%s|%s), want (%s|%s)", tc.query, r.Name, r.GetField(FieldDeviceType), tc.wantName, tc.wantType)
 		}
 	}
 }
@@ -253,7 +253,7 @@ func TestCatalogFuzzyRejectsUnrelated(t *testing.T) {
 		{Name: "ECG machine", Fields: map[string]string{"device_type": "Monitoring"}},
 	})
 	// A garbled, unrelated name must NOT be pulled to a fuzzy catalog hit.
-	r := NormalizeWithCatalog(Input{DeviceName: "Plasma rubber harness clamp fixture"}, cat)
+	r := NormalizeWithCatalogAndTaxonomy(Input{DeviceName: "Plasma rubber harness clamp fixture"}, cat, nil)
 	if r.MappingSource == "catalog_fuzzy" {
 		t.Fatalf("unrelated name should not fuzzy-match, got %+v", r)
 	}

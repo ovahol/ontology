@@ -233,7 +233,7 @@ func colAt(row []string, col int) string {
 	return strings.TrimSpace(row[col-1])
 }
 
-func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]string, extraHeaders []string, tax *Taxonomy) (string, error) {
+func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]string, extraHeaders []string, tax *Taxonomy, resolve rowResolver) (string, error) {
 	// Delete and recreate as first sheet
 	idx, err := f.GetSheetIndex(sheetName)
 	if err == nil {
@@ -260,7 +260,7 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 		styleHeader(f, sheetName, cell)
 	}
 	for rowIdx, row := range rows {
-		resolved := ResolveRowNamingFor(row, tax)
+		resolved := resolve(row, tax)
 		values := make([]string, len(headers))
 		values[0] = resolved.Name
 		for _, fd := range tax.Fields {
@@ -543,7 +543,7 @@ func rebuildInferenceRulesSheet(f *excelize.File, tax *Taxonomy) error {
 	return nil
 }
 
-func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
+func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, tax *Taxonomy, resolve rowResolver) error {
 	sheet := "Common Name Mapping Review"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -593,7 +593,7 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, 
 			"Source device type": source,
 			"EMDN term":          emdnTerm,
 		}
-		resolved := ResolveRowNamingFor(rmap, tax)
+		resolved := resolve(rmap, tax)
 		values := []string{legacy, colAt(row, 1)}
 		for _, fd := range tax.Fields {
 			values = append(values, colAt(row, layout.fieldCol[fd.Key]))
@@ -921,7 +921,8 @@ func limit(s []string, n int) []string {
 	return s[:n]
 }
 
-// NormalizeWorkbook normalizes an input workbook using the built-in Ovahol rules.
+// NormalizeWorkbook normalizes an input workbook using the embedded default
+// (MeDevis) taxonomy.
 func NormalizeWorkbook(inputPath, outputPath string) (string, error) {
 	return NormalizeWorkbookWithTaxonomy(inputPath, outputPath, nil)
 }
@@ -937,6 +938,23 @@ func NormalizeWorkbookAs(inputPath, outputPath string, tax interface{}) (string,
 
 // NormalizeWorkbookWithTaxonomy normalizes a workbook with the given vendor taxonomy.
 func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) (string, error) {
+	return normalizeWorkbook(inputPath, outputPath, tax, taxonomyRowResolver)
+}
+
+// NormalizeWorkbookWithCatalogAndTaxonomy normalizes a workbook with the given
+// vendor taxonomy, reconciling each row against the device dictionary cat
+// before falling back to taxonomy rules. This is the migration path for a host
+// system that already has a device dictionary: known names resolve verbatim
+// (MappingSource="catalog_exact"/"catalog_fuzzy"), and everything else falls
+// back to taxonomy inference. A nil cat behaves exactly like
+// NormalizeWorkbookWithTaxonomy.
+func NormalizeWorkbookWithCatalogAndTaxonomy(inputPath, outputPath string, cat Catalog, tax *Taxonomy) (string, error) {
+	return normalizeWorkbook(inputPath, outputPath, tax, makeCatalogRowResolver(cat))
+}
+
+// normalizeWorkbook is the shared workbook pipeline. resolve decides how each
+// row is turned into a ResolvedRow (taxonomy rules alone, or catalog-first).
+func normalizeWorkbook(inputPath, outputPath string, tax *Taxonomy, resolve rowResolver) (string, error) {
 	if tax == nil {
 		tax = DefaultTaxonomy()
 	}
@@ -957,7 +975,7 @@ func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) 
 	if err != nil {
 		return "", err
 	}
-	devicesSheet, err := rebuildDevicesSheet(f, firstSheet, rows, extraHeaders, tax)
+	devicesSheet, err := rebuildDevicesSheet(f, firstSheet, rows, extraHeaders, tax, resolve)
 	if err != nil {
 		return "", err
 	}
@@ -974,7 +992,7 @@ func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) 
 	if err := rebuildInferenceRulesSheet(f, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildCommonNameMappingReviewSheet(f, devicesSheet, tax); err != nil {
+	if err := rebuildCommonNameMappingReviewSheet(f, devicesSheet, tax, resolve); err != nil {
 		return "", err
 	}
 	if err := rebuildFamilyNamingReviewSheet(f, devicesSheet, tax); err != nil {

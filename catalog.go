@@ -36,29 +36,18 @@ func (e CatalogEntry) GetField(key string) string {
 	return e.Fields[key]
 }
 
-// DeviceType returns Fields[FieldDeviceType], if the vendor uses that key.
-func (e CatalogEntry) DeviceType() string { return e.GetField(FieldDeviceType) }
-
-// DeviceCategory returns Fields[FieldDeviceCategory], if the vendor uses that key.
-func (e CatalogEntry) DeviceCategory() string { return e.GetField(FieldDeviceCategory) }
-
-// DeviceFunction returns Fields[FieldDeviceFunction], if the vendor uses that key.
-func (e CatalogEntry) DeviceFunction() string { return e.GetField(FieldDeviceFunction) }
-
-// DeviceApplicationRisk returns Fields[FieldDeviceApplicationRisk], if the vendor uses that key.
-func (e CatalogEntry) DeviceApplicationRisk() string { return e.GetField(FieldDeviceApplicationRisk) }
-
 // Catalog is the host system's read-only device dictionary. Ontology calls
 // Find once per input; if it returns an entry ontology returns it verbatim
 // (MappingSource="catalog_exact", Confidence="high") instead of running
 // keyword inference. If nil is passed or Find returns !ok, ontology falls
 // back to taxonomy inference.
 //
-// This keeps ontology system-agnostic and small: Ovahol implements this
-// with a single SELECT, other systems can pass nil or an in-memory map.
-// No FamilyRule vendoring required.
+// This keeps ontology system-agnostic and small: a host system implements this
+// with a single lookup and maps its own dimension columns onto Fields keys;
+// other systems can pass nil or an in-memory map. No FamilyRule vendoring
+// required.
 //
-// Ovahol example (DB-backed, not vendored):
+// Example (DB-backed, not vendored):
 //
 //	type dbCatalog struct{ q *Queries }
 //	func (c *dbCatalog) Find(in ontology.Input) (*ontology.CatalogEntry, bool) {
@@ -68,14 +57,11 @@ func (e CatalogEntry) DeviceApplicationRisk() string { return e.GetField(FieldDe
 //	        Name: row.Name,
 //	        ID:   row.ID.String(),
 //	        Fields: map[string]string{
-//	            ontology.FieldDeviceType:            row.DeviceTypeName.String,
-//	            ontology.FieldDeviceCategory:        row.DeviceCategoryName.String,
-//	            ontology.FieldDeviceFunction:        row.DeviceFunctionName.String,
-//	            ontology.FieldDeviceApplicationRisk: row.DeviceApplicationRisk.String,
+//	            ontology.FieldDeviceType: row.DeviceTypeName.String,
 //	        },
 //	    }, true
 //	}
-//	// then: ontology.NormalizeWithCatalog(input, &dbCatalog{q})
+//	// then: ontology.NormalizeWithCatalogAndTaxonomy(input, &dbCatalog{q}, tax)
 type Catalog interface {
 	Find(input Input) (*CatalogEntry, bool)
 }
@@ -212,14 +198,7 @@ func scoreAgainst(query, candidate string) float64 {
 	return fuzzyScore(q, c)
 }
 
-// NormalizeWithCatalog is like Normalize but consults cat first.
-//
-// Deprecated: use NormalizeWithCatalogAndTaxonomy.
-func NormalizeWithCatalog(input Input, cat Catalog) Result {
-	return NormalizeWithCatalogAndTaxonomy(input, cat, nil)
-}
-
-// NormalizeWithCatalogAndTaxonomy is the vocab-less catalog entry point.
+// NormalizeWithCatalogAndTaxonomy is the catalog entry point.
 // It returns the catalog entry verbatim when matched (MappingSource=
 // "catalog_exact", Confidence="high", or "catalog_fuzzy"/"medium" for a
 // typo-tolerant match); otherwise it falls back to taxonomy inference.
@@ -252,30 +231,19 @@ func resultFromCatalogEntry(input Input, entry *CatalogEntry, mappingSource, con
 		fields[k] = v
 	}
 	return Result{
-		Name:                  entry.Name,
-		Fields:                fields,
-		DeviceType:            fields[FieldDeviceType],
-		DeviceCategory:        fields[FieldDeviceCategory],
-		DeviceFunction:        fields[FieldDeviceFunction],
-		DeviceApplication:     fields[FieldDeviceFunction],
-		DeviceApplicationRisk: fields[FieldDeviceApplicationRisk],
-		LegacySourceName:      input.DeviceName,
-		SourceType:            input.SourceType,
-		EMDNCode:              firstNonEmpty(input.EMDNCode, entry.EMDNCode),
-		EMDNTerm:              firstNonEmpty(input.EMDNTerm, entry.EMDNTerm),
-		MappingSource:         mappingSource,
-		Confidence:            confidence,
+		Name:             entry.Name,
+		Fields:           fields,
+		LegacySourceName: input.DeviceName,
+		SourceType:       input.SourceType,
+		EMDNCode:         firstNonEmpty(input.EMDNCode, entry.EMDNCode),
+		EMDNTerm:         firstNonEmpty(input.EMDNTerm, entry.EMDNTerm),
+		MappingSource:    mappingSource,
+		Confidence:       confidence,
 	}
 }
 
-// NormalizeBatchWithCatalog is the batch analogue.
-//
-// Deprecated: use NormalizeBatchWithCatalogAndTaxonomy.
-func NormalizeBatchWithCatalog(inputs []Input, cat Catalog) []Result {
-	return NormalizeBatchWithCatalogAndTaxonomy(inputs, cat, nil)
-}
-
-// NormalizeBatchWithCatalogAndTaxonomy is the vocab-less batch entry point.
+// NormalizeBatchWithCatalogAndTaxonomy normalizes a slice of inputs, consulting
+// cat before falling back to taxonomy inference per row.
 func NormalizeBatchWithCatalogAndTaxonomy(inputs []Input, cat Catalog, tax *Taxonomy) []Result {
 	out := make([]Result, 0, len(inputs))
 	for _, in := range inputs {

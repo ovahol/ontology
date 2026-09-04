@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed — deprecated Ovahol mirror code
+
+The engine previously carried deprecated fixed fields that mirrored the pluggable
+`Fields` map, plus the convenience wrappers that predated the taxonomy-aware
+entry points. All of it is gone; `Fields` (and `GetField`/`SetField`) is now the
+sole storage for taxonomy dimensions, and there are no hardcoded dimension
+fields woven through the types.
+
+- `Result`: removed the deprecated `DeviceType`, `DeviceCategory`,
+  `DeviceFunction`, `DeviceApplication`, `DeviceApplicationRisk` mirror fields,
+  the `syncFieldsFromFixed`/`syncFixedFromFields` mirrors,
+  `GetField`/`SetField` mirror fallbacks, the `*Accessor()` shims, and
+  `SearchAliasesString`. `GetField`/`SetField` are now pure `Fields` accessors.
+- `ResolvedRow`: removed the same deprecated mirror fields and accessor shims.
+- `InterchangeRecord` + `Result.ToInterchangeRecord` (unused export) removed.
+- `APIImportRecord`: removed the fixed `DeviceType`/`DeviceCategory`/`DeviceFunction`/
+  `DeviceApplicationRisk` fields; dimensions live in `Fields` (see `GetField`).
+- `CatalogEntry`: removed the `DeviceType()`/`DeviceCategory()`/`DeviceFunction()`/
+  `DeviceApplicationRisk()` accessor helpers; use `GetField`.
+- `ToCSV` is now taxonomy-driven: it emits `Name`, then one column per resolved
+  `Fields` key (sorted), then the input echo and diagnostics — no more hardcoded
+  Ovahol dimension columns.
+- Removed the deprecated no-taxonomy wrappers: `Normalize`, `NormalizeBatch`,
+  `NormalizeJSON`, `NormalizeJSONFile`, `NormalizeWithCatalog`,
+  `NormalizeBatchWithCatalog`. Use the `*WithTaxonomy` / `*AndTaxonomy` variants.
+- Removed the dead `DefaultDeviceSheetHeaders` / `DefaultAPIImportHeaders`
+  exports.
+
+### Added — catalog-aware workbook migration path
+
+`NormalizeWorkbookWithTaxonomy` was taxonomy-only: it classified each inventory
+row with rules, so a host system's own device dictionary couldn't drive the
+spreadsheet migration. New:
+
+- `NormalizeWorkbookWithCatalogAndTaxonomy(inputPath, outputPath, cat, tax)` —
+  reconciles each row against a device dictionary `cat` first (exact, then
+  typo-tolerant), falling back to taxonomy rules on a miss — mirroring the
+  single-row `NormalizeWithCatalogAndTaxonomy` path at the workbook level.
+  Known rows resolve verbatim (`MappingSource` = `catalog_exact`/`catalog_fuzzy`).
+- A nil `cat` behaves exactly like the taxonomy-only path.
+- Row resolution is now a seam (`workbook_resolver.go`), so the Devices and
+  Common Name Mapping Review sheets reflect whatever resolver runs — catalog
+  or rules.
+- Test: `TestNormalizeWorkbookWithCatalog` proves a foreign `device_tier`-only
+  dictionary reconciles a workbook through the catalog path while passthrough
+  columns (Model, Serial number) are preserved, and
+  `TestNormalizeWorkbookWithNilCatalogIsTaxonomyOnly` covers the fallback.
+
 ### Changed — ontology is now an engine; vendors bring their own taxonomy
 
 Previously the *shape* of a taxonomy was still fixed by this library (8 device

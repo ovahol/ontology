@@ -79,7 +79,7 @@ result.MappingSource         // "specific_rule" | "legacy_derived" | "family_fal
 result.Confidence            // "high" | "medium" | "low" | "none"
 ```
 
-`Result` also carries deprecated fixed accessors (`DeviceType`, `DeviceCategory`, `DeviceFunction`, `DeviceApplicationRisk`, `DeviceApplication`) that mirror `Fields["device_type"]` and friends — a convenience for the common case where your taxonomy happens to use those conventional keys, kept for callers who pinned an earlier version of this library before `Fields` existed. A taxonomy with different dimensions (like `risk_tier` above) simply won't populate them; read `result.Fields["risk_tier"]` instead.
+`Result.Fields` is the **sole** storage for taxonomy dimensions — a `Result` carries no fixed dimension fields. Read `result.Fields["device_type"]` or `result.GetField("device_type")`; a taxonomy with different keys (like `risk_tier`) works the same way.
 
 ```json
 {
@@ -90,10 +90,6 @@ result.Confidence            // "high" | "medium" | "low" | "none"
     "device_function": "Surgical and Intensive Care",
     "device_application_risk": "Potential patient or operator injury"
   },
-  "device_type": "Treatment, Surgical & Life Support Devices",
-  "device_category": "Therapeutic",
-  "device_function": "Surgical and Intensive Care",
-  "device_application_risk": "Potential patient or operator injury",
   "legacy_source_name": "Infusion pump, volumetric",
   "source_type": "infusion devices",
   "mapping_source": "family_fallback",
@@ -108,11 +104,13 @@ If the host system already has a device dictionary (e.g. Ovahol's `core_public.d
 ```go
 cat := ontology.NewInMemoryCatalog([]ontology.CatalogEntry{
     {
-        Name:                  "ECG machine",
-        DeviceType:            "Monitoring & Measurement Devices",
-        DeviceCategory:        "Diagnostic",
-        DeviceFunction:        "Additional Physiological Monitoring and Diagnostic",
-        DeviceApplicationRisk: "Inappropriate therapy or misdiagnosis",
+        Name: "ECG machine",
+        Fields: map[string]string{
+            "device_type":             "Monitoring & Measurement Devices",
+            "device_category":         "Diagnostic",
+            "device_function":         "Additional Physiological Monitoring and Diagnostic",
+            "device_application_risk": "Inappropriate therapy or misdiagnosis",
+        },
     },
 })
 
@@ -132,13 +130,25 @@ csvPath, err := ontology.NormalizeWorkbookWithTaxonomy("legacy_inventory.xlsx", 
 fmt.Println(csvPath) // <output>.api_import.csv, next to the .xlsx
 ```
 
+If your host system has a device dictionary, reconcile the workbook against it
+before falling back to rules — known rows resolve verbatim, unknown rows still
+classify by taxonomy:
+
+```go
+csvPath, err := ontology.NormalizeWorkbookWithCatalogAndTaxonomy("inventory.xlsx", "normalized.xlsx", myCatalog, tax)
+```
+
+Anything the taxonomy doesn't classify — Model, Manufacturer, Serial number, or
+any other input column — is passed through to the output untouched; the engine
+never drops caller data it doesn't recognize.
+
 The output workbook mirrors the reference template:
 
 | Sheet | Contents |
 |-------|----------|
-| *(first sheet, original name preserved)* | One row per device: name, and the 4 conventional dimensions (type/category/function/risk) if the taxonomy declares them, plus legacy source passthrough |
+| *(first sheet, original name preserved)* | One row per device: name, one column per `tax.Fields` field the taxonomy declares (any dimensions), plus legacy source passthrough |
 | API Import | Deduplicated, API-ready rows |
-| Lookups | One column per taxonomy field that declares `allowed_values` — however many dimensions the taxonomy has (used for Excel dropdown validation on the 4 conventional columns) |
+| Lookups | One column per taxonomy field that declares `allowed_values` — however many dimensions the taxonomy has (used for Excel dropdown validation on those columns) |
 | Naming Rules | `Taxonomy.NamingRules`, if the vendor supplies any |
 | Inference Rules | The vendor's `Inference.Rules` list verbatim (keywords/source types/requires → sets), for audit |
 | Common Name Mapping Review | Legacy → mapped name audit trail |

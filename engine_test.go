@@ -20,8 +20,8 @@ func TestEngineWithOvaholTaxonomy(t *testing.T) {
 		SourceType: "monitoring equipment",
 	})
 
-	if res.DeviceType != "Monitoring & Measurement Devices" {
-		t.Errorf("expected DeviceType 'Monitoring & Measurement Devices', got %q", res.DeviceType)
+	if res.GetField(FieldDeviceType) != "Monitoring & Measurement Devices" {
+		t.Errorf("expected DeviceType 'Monitoring & Measurement Devices', got %q", res.GetField(FieldDeviceType))
 	}
 	if res.Confidence != "high" {
 		t.Errorf("expected high confidence, got %q", res.Confidence)
@@ -39,7 +39,7 @@ func TestEngineWithMedevisTaxonomy(t *testing.T) {
 		DeviceName: "Linear accelerator system",
 		SourceType: "Radiotherapy-related equipment",
 	})
-	if result.Confidence == "none" || result.DeviceType != "Radiotherapy-related equipment" {
+	if result.Confidence == "none" || result.GetField(FieldDeviceType) != "Radiotherapy-related equipment" {
 		t.Errorf("expected valid classification from medevis taxonomy, got %+v", result)
 	}
 }
@@ -166,8 +166,8 @@ func TestEngineWithCustomVendorRules(t *testing.T) {
 		SourceType: "cryo devices",
 	})
 
-	if res.DeviceType != "" {
-		t.Errorf("vendor declares no device_type field; expected empty deprecated DeviceType accessor, got %q", res.DeviceType)
+	if res.GetField(FieldDeviceType) != "" {
+		t.Errorf("vendor declares no device_type field; expected empty deprecated DeviceType accessor, got %q", res.GetField(FieldDeviceType))
 	}
 	if res.Fields["device_tier"] != "Tier 1 - Critical" {
 		t.Errorf("expected Fields[device_tier] = 'Tier 1 - Critical', got %q (fields: %+v)", res.Fields["device_tier"], res.Fields)
@@ -220,8 +220,8 @@ func TestEngineWithCatalogOverride(t *testing.T) {
 		DeviceName: "custom-sensor",
 	})
 
-	if res.DeviceType != "Sensors & Actuators" {
-		t.Errorf("expected DeviceType from catalog 'Sensors & Actuators', got %q", res.DeviceType)
+	if res.GetField(FieldDeviceType) != "Sensors & Actuators" {
+		t.Errorf("expected DeviceType from catalog 'Sensors & Actuators', got %q", res.GetField(FieldDeviceType))
 	}
 	if res.MappingSource != "catalog_exact" {
 		t.Errorf("expected MappingSource 'catalog_exact', got %q", res.MappingSource)
