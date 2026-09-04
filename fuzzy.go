@@ -95,15 +95,21 @@ func fuzzyScore(query, candidate []string) float64 {
 
 // fuzzyNameMatch reports whether query (a possibly-misspelled device name or
 // term) is close enough to candidate to be treated as the same entry. It
-// requires a solid token-coverage score and a name long enough to be
-// meaningful, so short inputs (e.g. "bed") do not spuriously match.
+// requires a solid token-coverage score in both directions and normalized
+// names long enough to be meaningful, so short or subset inputs (e.g. "bed",
+// or a short candidate fully covered by a longer query) do not spuriously
+// match.
 func fuzzyNameMatch(query, candidate string) bool {
 	q := strings.Fields(Normalized(query))
 	c := strings.Fields(Normalized(candidate))
 	if len(q) == 0 || len(c) == 0 {
 		return false
 	}
-	score := fuzzyScore(q, c)
-	// Require meaningful coverage (>=70%) and enough query substance.
-	return score >= 0.70 && len(Normalized(query)) >= 4
+	if len(Normalized(query)) < 4 || len(Normalized(candidate)) < 4 {
+		return false
+	}
+	// Require meaningful coverage (>=70%) both ways: the candidate must cover
+	// most of the query and the query must cover most of the candidate, so a
+	// one-direction subset cannot match.
+	return fuzzyScore(q, c) >= 0.70 && fuzzyScore(c, q) >= 0.70
 }

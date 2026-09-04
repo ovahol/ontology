@@ -621,6 +621,23 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, 
 	return nil
 }
 
+// resolveRowNaming re-resolves one devices-sheet row (its legacy source name,
+// source device type, and EMDN term) through the taxonomy resolver, returning
+// the canonical name and search aliases it produces. Aggregation uses these to
+// record distinct naming values per family so the naming consistency outputs
+// reflect canonical and alias data rather than common names alone.
+func resolveRowNaming(row []string, layout deviceSheetLayout, tax *Taxonomy) (canonical string, aliases []string) {
+	rowMap := map[string]string{
+		"Legacy source name": colAt(row, layout.legacyCol),
+		"Source device type": colAt(row, layout.sourceCol),
+	}
+	if layout.emdnTermCol != 0 {
+		rowMap["EMDN term"] = colAt(row, layout.emdnTermCol)
+	}
+	res := ResolveRowNamingFor(rowMap, tax)
+	return res.CanonicalName, res.CommonNames
+}
+
 func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
 	sheet := "Family Naming Review"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
@@ -679,6 +696,14 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string, tax *
 		a.count++
 		if v := colAt(row, 1); v != "" {
 			a.common[v] = true
+		}
+		if canonical, aliases := resolveRowNaming(row, layout, tax); canonical != "" {
+			a.canonical[canonical] = true
+			for _, c := range aliases {
+				if c != "" {
+					a.aliases[c] = true
+				}
+			}
 		}
 		if v := colAt(row, layout.sourceCol); v != "" {
 			a.sources[v] = true
@@ -789,6 +814,14 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string, tax *T
 			a := grouped[k]
 			if v := colAt(row, 1); v != "" {
 				a.common[v] = true
+			}
+			if canonical, aliases := resolveRowNaming(row, layout, tax); canonical != "" {
+				a.canonical[canonical] = true
+				for _, c := range aliases {
+					if c != "" {
+						a.aliases[c] = true
+					}
+				}
 			}
 		}
 	}

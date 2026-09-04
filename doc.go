@@ -72,7 +72,7 @@
 //   - NormalizeWorkbookWithTaxonomy / NormalizeCSVWithTaxonomy: file bulk import
 //   - NormalizeJSONWithTaxonomy: JSON arrays/objects
 //   - ReconcileIdentity: completed identity (Unknown placeholders + status)
-//   - Engine: NewEngine + WithTaxonomy/WithCatalog/WithConventions/WithIdentityResolver
+//   - Engine: NewEngine(tax, ...) + WithCatalog/WithConventions/WithIdentityResolver
 //   - DefaultTaxonomy: the embedded WHO/MeDevIS reference vocabulary
 //
 // # Interchange schema

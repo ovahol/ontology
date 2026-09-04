@@ -265,7 +265,8 @@ func HumanizeNameFor(text string, tax *Taxonomy) string {
 		} else if i > 0 && isLowered(lw) {
 			words[i] = lw
 		} else {
-			words[i] = strings.ToUpper(lw[:1]) + lw[1:]
+			r := []rune(lw)
+			words[i] = strings.ToUpper(string(r[0])) + string(r[1:])
 		}
 	}
 	return strings.Join(words, " ")

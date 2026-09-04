@@ -10,8 +10,8 @@ import (
 
 func main() {
 	// ontology is an engine: it needs a vendor taxonomy. Here we load an
-	// example vendor taxonomy (Ovahol). Vendors ship their own taxonomy in
-	// their own codebase and load it with LoadTaxonomyFile.
+	// example vendor taxonomy (the MeDevIS reference). Vendors ship their own
+	// taxonomy in their own codebase and load it with LoadTaxonomyFile.
 	tax, err := ontology.LoadTaxonomyFile("examples/taxonomies/medevis.json")
 	if err != nil {
 		log.Fatalf("load taxonomy: %v", err)

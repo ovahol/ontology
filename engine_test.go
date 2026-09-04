@@ -8,8 +8,8 @@ import (
 	"github.com/xuri/excelize/v2"
 )
 
-func TestEngineWithOvaholTaxonomy(t *testing.T) {
-	tax, err := LoadTaxonomyFile("examples/taxonomies/ovahol.json")
+func TestEngineWithFixtureTaxonomy(t *testing.T) {
+	tax, err := LoadTaxonomyFile("testdata/fixture.json")
 	if err != nil {
 		t.Fatalf("LoadTaxonomyFile error: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestEngineWithMedevisTaxonomy(t *testing.T) {
 // TestMeDevisDefaultReconciliation proves the embedded default (MeDevIS)
 // taxonomy reconciles every real MeDevIS row to its exact (device_type,
 // service_type, knowledge_level, reusable) tuple by device name alone — the
-// same migration guarantee the Ovahol dictionary test gives, but for a
+// same migration guarantee the dictionary reconciliation test gives, but for a
 // genuinely different vendor whose vocabulary sits in its own field keys.
 // It reads the reference devices.xlsx, so it is skipped when that (gitignored,
 // local-only) file is absent.
@@ -74,7 +74,7 @@ func TestMeDevisDefaultReconciliation(t *testing.T) {
 		dup[strings.TrimSpace(r[0])]++
 	}
 	for i, r := range rows {
-		if i == 0 || len(r) == 0 {
+		if i == 0 || len(r) < 7 {
 			continue
 		}
 		name := strings.TrimSpace(r[0])

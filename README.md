@@ -15,9 +15,16 @@ Requires Go 1.27.0 or later.
 ## Quick start
 
 ```go
-import "github.com/ovahol/ontology"
+import (
+    "fmt"
+
+    "github.com/ovahol/ontology"
+)
 
 tax, err := ontology.LoadTaxonomyFile("my_taxonomy.json")
+if err != nil {
+    panic(err)
+}
 
 result := ontology.NormalizeWithTaxonomy(ontology.Input{
     DeviceName: "ECG machine, portable, 12-lead",
@@ -79,7 +86,7 @@ A `Taxonomy` is two things, and nothing else:
 
 Load it with `ontology.LoadTaxonomyFile("acme.json")`. A vendor with two dimensions declares two; a vendor with eight declares eight — nothing here is Ovahol-shaped or MeDevIS-shaped. `Taxonomy.Validate()` checks it's well-formed (an id, a semver version, at least one required field with its vocabulary spelled out).
 
-Rules also support `source_types` (match against the normalized source type instead of/alongside keywords), `exclude_keywords`, and `name` / `canonical_name` (to assign the device's display name directly instead of deriving it from the legacy text). See [`taxonomy_version.go`](./taxonomy_version.go) for the full `Rule`/`FieldDef` shapes, and [`examples/taxonomies/ovahol.json`](./examples/taxonomies/ovahol.json) for a taxonomy with ~290 rules across 5 dimensions as a fully worked example.
+Rules also support `source_types` (match against the normalized source type instead of/alongside keywords), `exclude_keywords`, and `name` / `canonical_name` (to assign the device's display name directly instead of deriving it from the legacy text). See [`taxonomy_version.go`](./taxonomy_version.go) for the full `Rule`/`FieldDef` shapes, and [`testdata/fixture.json`](./testdata/fixture.json) for a compact 4-dimension taxonomy with source-type and exact-name rules as a worked example.
 
 If none of a field's rules fire but the taxonomy declares `allowed_values` for it, the engine tries one more thing for free: matching the normalized source type directly against those allowed values. This is why the MeDevIS default taxonomy also classifies anything whose source type happens to already be one of its 39 device type names — even though its exact-name rules already reconcile every known device.
 
@@ -88,7 +95,7 @@ If none of a field's rules fire but the taxonomy declares `allowed_values` for i
 ```go
 result.Name                  // normalized display name, e.g. "ECG machine"
 result.Fields                // map[string]string — every field the taxonomy resolved, keyed by field key
-result.MappingSource         // "specific_rule" | "legacy_derived" | "family_fallback" | "unsupported_source_type" | "catalog_exact"
+result.MappingSource         // "specific_rule" | "legacy_derived" | "family_fallback" | "unsupported_source_type" | "catalog_exact" | "catalog_fuzzy"
 result.Confidence            // "high" | "medium" | "low" | "none"
 ```
 
@@ -249,7 +256,7 @@ Omit `--taxonomy`/`--taxonomy-dir` to use the embedded WHO/MeDevIS default.
 
 This library normalizes **vocabulary** — it does not:
 
-- Own any vendor's vocabulary. Ovahol's, MeDevIS's, and any other taxonomy under `examples/taxonomies/` are examples/fixtures for this repo's own tests, not vocabulary this library ships as *the* vocabulary.
+- Own any vendor's vocabulary. The embedded default is the neutral WHO/MeDevIS reference; everything else — MeDevIS convenience copies, the `testdata/` fixtures, and anything in `examples/` — exists for this repo's tests and demos, not as *the* vocabulary.
 - Resolve foreign keys (model IDs, location IDs, status IDs) — those are facility-specific and resolved by the importer after normalization.
 - Validate business rules (e.g. "is this device allowed at this facility?") — that's the application's job.
 - Handle non-device entities (work orders, training sessions, etc.) — use `facilityimport` in the Ovahol monorepo for the full facility lifecycle import.
