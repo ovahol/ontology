@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — engine identity reconciliation (system-agnostic)
+
+New identity-reconciliation mechanism so vendors can complete a device record's
+identity (device/model/brand/manufacturer/status) without the engine knowing any
+vendor's vocabulary. All placeholders and the status set are vendor-supplied.
+
+- `Conventions` — the vendor's "Unknown" placeholder templates (`UnknownDevice`,
+  `UnknownBrand`, `UnknownManufacturer`, `UnknownModelPrefix`) plus a controlled
+  `Statuses` vocabulary, per-status `StatusSynonyms` (free-text source statuses
+  reconciled case-insensitively to a canonical status), and `DefaultStatus`.
+  Zero value performs no substitution.
+- `IdentityResolver` — optional interface mapping an inbound identity tuple to
+  the canonical entity names via the vendor's own reference-data foreign keys
+  (e.g. model -> brand -> manufacturer); empty values fall back to Unknown.
+- `IdentityInput` / `IdentityResult` — raw vs reconciled identity (JSON keys
+  mirror a lifecycle export).
+- `ReconcileIdentity(in, res, conv)` — package-level reconciliation (Unknown
+  fallback + status normalization); `Engine.Reconcile` is the `Engine` counterpart.
+- `Engine` options: `WithConventions` and `WithIdentityResolver`.
+- New tests (`identity_test.go`): Unknown conventions, per-device unknown-model,
+  resolver canonicalization, status normalization, zero-value neutrality.
+- Example rewritten: `examples/ovahol` now binds Ovahol's taxonomy, `CSVCatalog`,
+  an FK-chain `IdentityResolver` over models/brands/manufacturers, and Ovahol's
+  `Conventions` to one `Engine`, then uses `Normalize` + `Reconcile`.
+- `examples/ovahol/conventions.go` removed (its Ovahol-specific
+  `ApplyUnknownConventions`/`MigrationRecord` moved into the configured engine).
+
 ### Removed — deprecated Ovahol mirror code
 
 The engine previously carried deprecated fixed fields that mirrored the pluggable

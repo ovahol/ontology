@@ -37,6 +37,19 @@ result := engine.Normalize(input)
 results := engine.NormalizeBatch(inputs)
 ```
 
+The `Engine` also reconciles identity — the device name, model, brand,
+manufacturer, and a controlled status — using only vendor-supplied conventions
+and an optional FK resolver (see [identity reconciliation](#identity-reconciliation)):
+
+```go
+engine := ontology.NewEngine(tax,
+    ontology.WithCatalog(myCatalog),
+    ontology.WithConventions(myConventions),       // Unknown placeholders + status set
+    ontology.WithIdentityResolver(myResolver),     // walks model->brand->manufacturer
+)
+id := engine.Reconcile(ontology.IdentityInput{DeviceName: result.Name, Model: dm.Model, Status: "Active"})
+```
+
 If you don't have a taxonomy yet, `ontology.Normalize(input)` (no taxonomy argument) falls back to an embedded neutral reference taxonomy derived from WHO's MeDevIS nomenclature — useful for getting started, not a substitute for your own vocabulary.
 
 ## Taxonomy: your vocabulary, your rules
@@ -119,6 +132,68 @@ result := ontology.NormalizeWithCatalogAndTaxonomy(ontology.Input{DeviceName: "E
 ```
 
 Matching is by EMDN code, then device name, then EMDN term (all normalized/lowercased). A catalog miss falls back to ordinary taxonomy inference; a `nil` catalog always falls back. Implement `Catalog` yourself (e.g. backed by a single SQL lookup) to avoid vendoring the whole dictionary — see [`catalog.go`](./catalog.go) for the interface and a DB-backed example. `NormalizeBatchWithCatalogAndTaxonomy` is the batch analogue, and `Engine`/`WithCatalog` wraps both together.
+
+## Identity reconciliation
+
+Classification tells you what a device *is*; reconciliation tells you how it
+*exists* in your system — its device name, model, brand, manufacturer, and
+status. The engine completes identity the same way it classifies: it only
+executes what you configure, so no identity vocabulary is hardcoded here.
+
+Two vendor-supplied pieces bind to `Engine.Reconcile`:
+
+- **`Conventions`** — your "Unknown" placeholder templates and your controlled
+  status vocabulary:
+
+  ```go
+  conv := ontology.Conventions{
+      UnknownDevice:       "Unknown Device",
+      UnknownBrand:        "Unknown Brand",
+      UnknownManufacturer: "Unknown Manufacturer",
+      UnknownModelPrefix:  "Unknown Model - ", // per-device unknown model, keeps FK resolvable
+      Statuses: []string{
+          "In-Service", "Decommissioned", "Transferred", "Standby / Spare",
+          "Under Maintenance", "Out of Service", "Disposed", "New / Commissioning",
+      },
+      // Source inventories use many free-text terms for a status; each maps
+      // (case-insensitively) to Ovahol's canonical status. Anything unmatched
+      // falls back to DefaultStatus.
+      StatusSynonyms: map[string][]string{
+          "In-Service":        {"functional", "functioning", "active", "in active service", "working"},
+          "Under Maintenance": {"faulty", "not working", "broken down", "broken down and repairable"},
+          "Out of Service":    {"down", "offline"},
+          "Standby / Spare":   {"standby", "spare", "reserve"},
+          "Disposed":          {"discarded", "scrapped"},
+      },
+      DefaultStatus: "New / Commissioning", // conservative default on ingest
+  }
+  ```
+
+- **`IdentityResolver`** — an optional interface that maps an inbound identity
+  tuple to the canonical entity names via your own reference-data foreign keys
+  (e.g. model -> brand -> manufacturer); return empty strings for anything you
+  can't resolve and the engine fills the Unknown placeholders.
+
+```go
+engine := ontology.NewEngine(tax,
+    ontology.WithCatalog(myCatalog),
+    ontology.WithConventions(conv),
+    ontology.WithIdentityResolver(myResolver),
+)
+result := engine.Normalize(ontology.Input{DeviceName: "ECG machine"})
+id := engine.Reconcile(ontology.IdentityInput{
+    DeviceName:   result.Name, // the classified name
+    Model:        src.Model,   Brand: src.Brand, Manufacturer: src.Manufacturer,
+    Status:       src.Status,
+})
+// id.Device / id.Model / id.Brand / id.Manufacturer / id.Status all non-empty
+// where Applies; status is normalized into Statuses (case-insensitively, via
+// StatusSynonyms) or DefaultStatus on a miss.
+```
+
+`ReconcileIdentity(in, res, conv)` is the resolver-free, package-level
+counterpart. A zero-value `Conventions` invents no strings and normalizes no
+status, so the mechanism is fully opt-in.
 
 ## Workbook interchange (bulk migration)
 

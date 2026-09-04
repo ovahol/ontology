@@ -35,12 +35,44 @@
 //	engine := ontology.NewEngine(tax, ontology.WithCatalog(myCatalog))
 //	result := engine.Normalize(input)
 //
+// # Identity reconciliation
+//
+// Classification tells you what a device is; reconciliation tells you how it
+// exists in the vendor's system — its name, model, brand, manufacturer, and a
+// controlled status. The engine provides an identity-reconciliation mechanism
+// that is also entirely vendor-configured, so no identity vocabulary is
+// hardcoded here:
+//
+//	engine := ontology.NewEngine(tax,
+//	    ontology.WithCatalog(myCatalog),
+//	    ontology.WithConventions(myConventions),        // Unknown placeholders + status set
+//	    ontology.WithIdentityResolver(myResolver),      // walks model->brand->manufacturer
+//	)
+//	id := engine.Reconcile(ontology.IdentityInput{
+//	    DeviceName: result.Name, // the classified name
+//	    Model:      src.Model,
+//	    Brand:      src.Brand,
+//	    Manufacturer: src.Manufacturer,
+//	    Status:     src.Status,
+//	})
+//
+// `Conventions` is the vendor's Unknown placeholder templates, its controlled
+// `Statuses` vocabulary (with a `DefaultStatus`), and `StatusSynonyms` mapping
+// free-text source statuses (e.g. "functional", "broken down") to a canonical
+// status. `IdentityResolver`
+// maps an inbound identity tuple to the canonical entity names via the vendor's
+// own reference-data foreign keys; return empty strings for anything you cannot
+// resolve and the engine fills the Unknown placeholders. ReconcileIdentity is
+// the resolver-free counterpart.
+//
 // # Public entry points
 //
 //   - NormalizeWithTaxonomy / NormalizeBatchWithTaxonomy: single/batch records
 //   - NormalizeWithCatalogAndTaxonomy: catalog-first exact match, taxonomy fallback
 //   - NormalizeWorkbookWithTaxonomy / NormalizeCSVWithTaxonomy: file bulk import
 //   - NormalizeJSONWithTaxonomy: JSON arrays/objects
+//   - ReconcileIdentity: completed identity (Unknown placeholders + status)
+//   - Engine: NewEngine + WithTaxonomy/WithCatalog/WithConventions/WithIdentityResolver
 //   - DefaultTaxonomy: the embedded WHO/MeDevIS reference vocabulary
 //
 // # Interchange schema
