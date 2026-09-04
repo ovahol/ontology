@@ -37,7 +37,16 @@ func setCell(f *excelize.File, sheet string, row, col int, value string) {
 
 // extractDeviceRows reads the first sheet's header row and returns row maps.
 // It mimics Python's extract_device_rows which tolerates alternative header names.
-func extractDeviceRows(f *excelize.File, sheetName string) ([]map[string]string, []string, error) {
+//
+// Any input column that isn't recognized as one of the known device/taxonomy
+// fields (model, manufacturer, serial number, location, whatever the source
+// inventory happens to carry) is not classification data ontology understands
+// — but it isn't discarded either. It's kept verbatim, under its original
+// header text, in both the returned rows and the extraHeaders list (in
+// original column order), so rebuildDevicesSheet can pass it straight through
+// to the output. ontology only ever adds classification columns; it never
+// drops caller data it doesn't recognize.
+func extractDeviceRows(f *excelize.File, sheetName string) (result []map[string]string, extraHeaders []string, err error) {
 	rows, err := f.GetRows(sheetName)
 	if err != nil {
 		return nil, nil, err
@@ -61,36 +70,64 @@ func extractDeviceRows(f *excelize.File, sheetName string) ([]map[string]string,
 			emdnTermKey = h
 		}
 	}
+	consumed := map[int]bool{}
 	find := func(keys ...string) int {
 		for _, k := range keys {
 			if idx, ok := headerMap[k]; ok {
+				consumed[idx] = true
 				return idx
 			}
 		}
 		return -1
 	}
-	var result []map[string]string
-	for _, row := range rows[1:] {
-		get := func(keys ...string) string {
-			idx := find(keys...)
-			if idx >= 0 && idx < len(row) {
-				return strings.TrimSpace(row[idx])
-			}
-			return ""
+	get := func(row []string, keys ...string) string {
+		idx := find(keys...)
+		if idx >= 0 && idx < len(row) {
+			return strings.TrimSpace(row[idx])
 		}
+		return ""
+	}
+	// Resolve every known field once (against the header row only, via find's
+	// consumed side effect) so `consumed` is complete before we decide what's
+	// left over as passthrough.
+	find("Name", "Common name", "common_name")
+	find("Canonical device name", "canonical_device_name")
+	find("Common names", "Search aliases", "search_aliases", "common_names")
+	find("Device type", "device_type", "Ovahol device type", "ovahol_device_type")
+	find("Device family", "device_family", "Ovahol device family", "ovahol_device_family")
+	find("Device function", "device_function")
+	find("Device application risk", "device_application_risk")
+	find("Legacy source name", "Device name", "name", "legacy_source_name")
+	find("Source device type", "source_type")
+	find("EMDN code", "emdn_code", emdnCodeKey)
+	find("EMDN term", "emdn_term", emdnTermKey)
+	for i, h := range headers {
+		h = strings.TrimSpace(h)
+		if h == "" || consumed[i] {
+			continue
+		}
+		extraHeaders = append(extraHeaders, h)
+	}
+
+	for _, row := range rows[1:] {
 		// Also allow "Device name" / "name" etc. — support both new agnostic and legacy Ovahol headers for backward compat
 		m := map[string]string{
-			"Name":                    get("Name", "Common name", "common_name"),
-			"Canonical device name":   get("Canonical device name", "canonical_device_name"),
-			"Common names":            get("Common names", "Search aliases", "search_aliases", "common_names"),
-			"Device type":             get("Device type", "device_type", "Ovahol device type", "ovahol_device_type"),
-			"Device family":           get("Device family", "device_family", "Ovahol device family", "ovahol_device_family"),
-			"Device function":         get("Device function", "device_function"),
-			"Device application risk": get("Device application risk", "device_application_risk"),
-			"Legacy source name":      get("Legacy source name", "Device name", "name", "legacy_source_name"),
-			"Source device type":      get("Source device type", "source_type"),
-			"EMDN code":               get("EMDN code", "emdn_code", emdnCodeKey),
-			"EMDN term":               get("EMDN term", "emdn_term", emdnTermKey),
+			"Name":                    get(row, "Name", "Common name", "common_name"),
+			"Canonical device name":   get(row, "Canonical device name", "canonical_device_name"),
+			"Common names":            get(row, "Common names", "Search aliases", "search_aliases", "common_names"),
+			"Device type":             get(row, "Device type", "device_type", "Ovahol device type", "ovahol_device_type"),
+			"Device family":           get(row, "Device family", "device_family", "Ovahol device family", "ovahol_device_family"),
+			"Device function":         get(row, "Device function", "device_function"),
+			"Device application risk": get(row, "Device application risk", "device_application_risk"),
+			"Legacy source name":      get(row, "Legacy source name", "Device name", "name", "legacy_source_name"),
+			"Source device type":      get(row, "Source device type", "source_type"),
+			"EMDN code":               get(row, "EMDN code", "emdn_code", emdnCodeKey),
+			"EMDN term":               get(row, "EMDN term", "emdn_term", emdnTermKey),
+		}
+		for _, h := range extraHeaders {
+			if idx, ok := headerMap[h]; ok && idx < len(row) {
+				m[h] = strings.TrimSpace(row[idx])
+			}
 		}
 		// skip entirely empty rows
 		empty := true
@@ -105,7 +142,7 @@ func extractDeviceRows(f *excelize.File, sheetName string) ([]map[string]string,
 		}
 		result = append(result, m)
 	}
-	return result, headers, nil
+	return result, extraHeaders, nil
 }
 
 func colLetter(n int) string {
@@ -113,7 +150,90 @@ func colLetter(n int) string {
 	return letter
 }
 
-func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]string, tax *Taxonomy) (string, error) {
+// deviceSheetLayout is the 1-based column layout of the Devices sheet: Name,
+// then one column per tax.Fields entry in taxonomy order, then the fixed
+// input-echo columns. It's computed once and shared by every function that
+// reads or writes the Devices sheet, so "where is device_type's column"
+// is answered by field key (works for any taxonomy shape) rather than by
+// matching literal header text (which breaks the moment a taxonomy picks its
+// own Label wording).
+//
+// EMDN code/term get one column each, not two: if the taxonomy itself
+// declares "emdn_code"/"emdn_term" as fields (as a dictionary-derived
+// taxonomy naturally does, since rules resolve them from a device-name
+// match), that field's column IS the EMDN column — emdnCodeIsField/
+// emdnTermIsField record this so callers know to leave the raw input echo
+// out of it rather than clobbering the resolved value. Only a taxonomy that
+// doesn't model EMDN at all gets a separate, input-echo-only column.
+type deviceSheetLayout struct {
+	fieldCol                         map[string]int
+	legacyCol, sourceCol             int
+	emdnCodeCol, emdnTermCol         int
+	emdnCodeIsField, emdnTermIsField bool
+	totalFixed                       int
+}
+
+func newDeviceSheetLayout(tax *Taxonomy) deviceSheetLayout {
+	l := deviceSheetLayout{fieldCol: map[string]int{}}
+	col := 1 // column 1 is always Name
+	for _, fd := range tax.Fields {
+		col++
+		l.fieldCol[fd.Key] = col
+	}
+	l.legacyCol = col + 1
+	l.sourceCol = col + 2
+	next := col + 2
+	if c, ok := l.fieldCol["emdn_code"]; ok {
+		l.emdnCodeCol = c
+		l.emdnCodeIsField = true
+	} else {
+		next++
+		l.emdnCodeCol = next
+	}
+	if c, ok := l.fieldCol["emdn_term"]; ok {
+		l.emdnTermCol = c
+		l.emdnTermIsField = true
+	} else {
+		next++
+		l.emdnTermCol = next
+	}
+	l.totalFixed = next
+	return l
+}
+
+// deviceSheetHeaders returns the Devices sheet's header row for tax, with
+// extraHeaders (passthrough columns ontology didn't recognize) appended.
+func deviceSheetHeaders(tax *Taxonomy, extraHeaders []string) []string {
+	layout := newDeviceSheetLayout(tax)
+	headers := []string{"Name"}
+	for _, fd := range tax.Fields {
+		label := fd.Label
+		if label == "" {
+			label = fd.Key
+		}
+		headers = append(headers, label)
+	}
+	headers = append(headers, "Legacy source name", "Source device type")
+	if !layout.emdnCodeIsField {
+		headers = append(headers, "EMDN code")
+	}
+	if !layout.emdnTermIsField {
+		headers = append(headers, "EMDN term")
+	}
+	headers = append(headers, extraHeaders...)
+	return headers
+}
+
+// colAt reads row[col-1], treating col==0 (a field the taxonomy doesn't
+// declare) or an out-of-range row as simply absent rather than an error.
+func colAt(row []string, col int) string {
+	if col <= 0 || col-1 >= len(row) {
+		return ""
+	}
+	return strings.TrimSpace(row[col-1])
+}
+
+func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]string, extraHeaders []string, tax *Taxonomy) (string, error) {
 	// Delete and recreate as first sheet
 	idx, err := f.GetSheetIndex(sheetName)
 	if err == nil {
@@ -132,23 +252,33 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 		// If MoveSheet not available, we just keep creation order; not critical.
 	}
 
-	for colIdx, header := range DefaultDeviceSheetHeaders {
+	layout := newDeviceSheetLayout(tax)
+	headers := deviceSheetHeaders(tax, extraHeaders)
+	for colIdx, header := range headers {
 		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
 		f.SetCellValue(sheetName, cell, header)
 		styleHeader(f, sheetName, cell)
 	}
 	for rowIdx, row := range rows {
 		resolved := ResolveRowNamingFor(row, tax)
-		values := []string{
-			resolved.Name,
-			resolved.DeviceType,
-			resolved.DeviceCategory,
-			resolved.DeviceFunction,
-			resolved.DeviceApplicationRisk,
-			row["Legacy source name"],
-			row["Source device type"],
-			row["EMDN code"],
-			row["EMDN term"],
+		values := make([]string, len(headers))
+		values[0] = resolved.Name
+		for _, fd := range tax.Fields {
+			values[layout.fieldCol[fd.Key]-1] = resolved.Fields[fd.Key]
+		}
+		values[layout.legacyCol-1] = row["Legacy source name"]
+		values[layout.sourceCol-1] = row["Source device type"]
+		// EMDN: if the taxonomy resolved emdn_code/emdn_term as a field (e.g.
+		// from a dictionary-name match), that value wins; the raw input echo
+		// only fills in when the taxonomy didn't resolve one.
+		if values[layout.emdnCodeCol-1] == "" {
+			values[layout.emdnCodeCol-1] = row["EMDN code"]
+		}
+		if values[layout.emdnTermCol-1] == "" {
+			values[layout.emdnTermCol-1] = row["EMDN term"]
+		}
+		for i, h := range extraHeaders {
+			values[layout.totalFixed+i] = row[h]
 		}
 		for colIdx, v := range values {
 			setCell(f, sheetName, rowIdx+2, colIdx+1, v)
@@ -158,14 +288,42 @@ func rebuildDevicesSheet(f *excelize.File, sheetName string, rows []map[string]s
 	f.SetPanes(sheetName, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
 	maxRow := len(rows) + 1
 	if maxRow >= 2 {
-		f.AutoFilter(sheetName, fmt.Sprintf("A1:I%d", maxRow), nil)
+		f.AutoFilter(sheetName, fmt.Sprintf("A1:%s%d", colLetter(len(headers)), maxRow), nil)
 	}
-	widths := map[string]float64{"A": 28, "B": 34, "C": 24, "D": 34, "E": 34, "F": 48, "G": 34, "H": 18, "I": 44}
-	for col, w := range widths {
-		f.SetColWidth(sheetName, col, col, w)
+	f.SetColWidth(sheetName, "A", "A", 28)
+	for i := range tax.Fields {
+		col := colLetter(i + 2)
+		f.SetColWidth(sheetName, col, col, 30)
+	}
+	f.SetColWidth(sheetName, colLetter(layout.legacyCol), colLetter(layout.legacyCol), 48)
+	f.SetColWidth(sheetName, colLetter(layout.sourceCol), colLetter(layout.sourceCol), 34)
+	f.SetColWidth(sheetName, colLetter(layout.emdnCodeCol), colLetter(layout.emdnCodeCol), 18)
+	f.SetColWidth(sheetName, colLetter(layout.emdnTermCol), colLetter(layout.emdnTermCol), 44)
+	for i := range extraHeaders {
+		col := colLetter(layout.totalFixed + i + 1)
+		f.SetColWidth(sheetName, col, col, 24)
 	}
 	f.SetRowHeight(sheetName, 1, 18)
 	return sheetName, nil
+}
+
+// apiImportHeaders returns ["name", <tax.Fields keys in order>, "emdn_code",
+// "emdn_term"] — the API Import sheet/CSV's dynamic column set. A vendor's
+// own field keys are used verbatim, since this feeds whatever API expects
+// those exact keys.
+func apiImportHeaders(tax *Taxonomy) []string {
+	layout := newDeviceSheetLayout(tax)
+	headers := []string{"name"}
+	for _, fd := range tax.Fields {
+		headers = append(headers, fd.Key)
+	}
+	if !layout.emdnCodeIsField {
+		headers = append(headers, "emdn_code")
+	}
+	if !layout.emdnTermIsField {
+		headers = append(headers, "emdn_term")
+	}
+	return headers
 }
 
 func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
@@ -180,12 +338,15 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy)
 		return err
 	}
 	_ = newIdx
-	for colIdx, header := range DefaultAPIImportHeaders {
+	headers := apiImportHeaders(tax)
+	for colIdx, header := range headers {
 		cell, _ := excelize.CoordinatesToCellName(colIdx+1, 1)
 		f.SetCellValue(sheet, cell, header)
 		styleHeader(f, sheet, cell)
 	}
-	// read devices sheet rows
+	// read devices sheet rows, by position — the Devices sheet's classification
+	// columns are keyed by tax.Fields order, not by matching header text, so
+	// this works regardless of what Label a taxonomy chose for its fields.
 	rows, err := f.GetRows(devicesSheet)
 	if err != nil {
 		return err
@@ -193,62 +354,46 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy)
 	if len(rows) < 1 {
 		return nil
 	}
-	headerMap := map[string]int{}
-	for i, h := range rows[0] {
-		headerMap[h] = i
-	}
+	layout := newDeviceSheetLayout(tax)
 	seen := map[string]bool{}
 	outRow := 2
 	for _, row := range rows[1:] {
-		get := func(key string) string {
-			if idx, ok := headerMap[key]; ok && idx < len(row) {
-				return strings.TrimSpace(row[idx])
-			}
-			return ""
-		}
-		getWithFallback := func(keys ...string) string {
-			for _, k := range keys {
-				if v := get(k); v != "" {
-					return v
-				}
-			}
-			return ""
-		}
-		values := []string{
-			getWithFallback("Name", "Common name"),
-			getWithFallback("Device type", "Ovahol device type"),
-			getWithFallback("Device category"),
-			getWithFallback("Device function"),
-			getWithFallback("Device application risk"),
-			getWithFallback("EMDN code"),
-			getWithFallback("EMDN term"),
-		}
-		// skip if any of first 5 empty (requires name + 4 taxonomy fields)
-		if values[0] == "" || values[1] == "" || values[2] == "" || values[3] == "" || values[4] == "" {
+		name := colAt(row, 1)
+		if name == "" {
 			continue
 		}
-		// Generalized dedup: use APIImportRecord.DedupKey() so pluggable Fields participate automatically.
-		// For workbook rows we synthesize an APIImportRecord and delegate key generation.
-		rec := APIImportRecord{
-			Name:                  values[0],
-			DeviceType:            values[1],
-			DeviceCategory:        values[2],
-			DeviceFunction:        values[3],
-			DeviceApplicationRisk: values[4],
-			EMDNCode:              values[5],
-			EMDNTerm:              values[6],
-			Fields: map[string]string{
-				FieldDeviceType:            values[1],
-				FieldDeviceCategory:        values[2],
-				FieldDeviceFunction:        values[3],
-				FieldDeviceApplicationRisk: values[4],
-			},
+		fieldVals := make(map[string]string, len(tax.Fields))
+		requiredOK := true
+		for _, fd := range tax.Fields {
+			v := colAt(row, layout.fieldCol[fd.Key])
+			fieldVals[fd.Key] = v
+			if fd.Required && v == "" {
+				requiredOK = false
+			}
 		}
+		if !requiredOK {
+			continue
+		}
+		emdnCode := colAt(row, layout.emdnCodeCol)
+		emdnTerm := colAt(row, layout.emdnTermCol)
+
+		rec := APIImportRecord{Name: name, Fields: fieldVals, EMDNCode: emdnCode, EMDNTerm: emdnTerm}
 		key := rec.DedupKey()
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
+
+		values := []string{name}
+		for _, fd := range tax.Fields {
+			values = append(values, fieldVals[fd.Key])
+		}
+		if !layout.emdnCodeIsField {
+			values = append(values, emdnCode)
+		}
+		if !layout.emdnTermIsField {
+			values = append(values, emdnTerm)
+		}
 		for colIdx, v := range values {
 			setCell(f, sheet, outRow, colIdx+1, v)
 		}
@@ -256,11 +401,12 @@ func rebuildAPIImportSheet(f *excelize.File, devicesSheet string, tax *Taxonomy)
 	}
 	f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
 	if outRow > 2 {
-		f.AutoFilter(sheet, fmt.Sprintf("A1:G%d", outRow-1), nil)
+		f.AutoFilter(sheet, fmt.Sprintf("A1:%s%d", colLetter(len(headers)), outRow-1), nil)
 	}
-	widths := map[string]float64{"A": 34, "B": 24, "C": 34, "D": 34, "E": 18, "F": 42, "G": 42}
-	for col, w := range widths {
-		f.SetColWidth(sheet, col, col, w)
+	f.SetColWidth(sheet, "A", "A", 34)
+	for i := range tax.Fields {
+		col := colLetter(i + 2)
+		f.SetColWidth(sheet, col, col, 30)
 	}
 	return nil
 }
@@ -408,7 +554,22 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, 
 		return err
 	}
 	_ = newIdx
-	headers := []string{"Legacy source name", "Name", "Device type", "Device category", "Device function", "Device application risk", "EMDN code", "EMDN term", "Mapping source"}
+	layout := newDeviceSheetLayout(tax)
+	headers := []string{"Legacy source name", "Name"}
+	for _, fd := range tax.Fields {
+		label := fd.Label
+		if label == "" {
+			label = fd.Key
+		}
+		headers = append(headers, label)
+	}
+	if !layout.emdnCodeIsField {
+		headers = append(headers, "EMDN code")
+	}
+	if !layout.emdnTermIsField {
+		headers = append(headers, "EMDN term")
+	}
+	headers = append(headers, "Mapping source")
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		f.SetCellValue(sheet, cell, h)
@@ -421,51 +582,46 @@ func rebuildCommonNameMappingReviewSheet(f *excelize.File, devicesSheet string, 
 	if len(rows) < 1 {
 		return nil
 	}
-	headerMap := map[string]int{}
-	for i, h := range rows[0] {
-		headerMap[h] = i
-	}
 	outRow := 2
 	for _, row := range rows[1:] {
-		get := func(key string) string {
-			if idx, ok := headerMap[key]; ok && idx < len(row) {
-				return row[idx]
-			}
-			return ""
-		}
+		legacy := colAt(row, layout.legacyCol)
+		source := colAt(row, layout.sourceCol)
+		emdnTerm := colAt(row, layout.emdnTermCol)
 		// Re-resolve to get naming_source
 		rmap := map[string]string{
-			"Legacy source name": get("Legacy source name"),
-			"Source device type": get("Source device type"),
-			"EMDN term":          get("EMDN term"),
+			"Legacy source name": legacy,
+			"Source device type": source,
+			"EMDN term":          emdnTerm,
 		}
 		resolved := ResolveRowNamingFor(rmap, tax)
-		values := []string{
-			get("Legacy source name"),
-			get("Name"),
-			get("Device type"),
-			get("Device category"),
-			get("Device function"),
-			get("Device application risk"),
-			get("EMDN code"),
-			get("EMDN term"),
-			resolved.NamingSource,
+		values := []string{legacy, colAt(row, 1)}
+		for _, fd := range tax.Fields {
+			values = append(values, colAt(row, layout.fieldCol[fd.Key]))
 		}
+		if !layout.emdnCodeIsField {
+			values = append(values, colAt(row, layout.emdnCodeCol))
+		}
+		if !layout.emdnTermIsField {
+			values = append(values, emdnTerm)
+		}
+		values = append(values, resolved.NamingSource)
 		for colIdx, v := range values {
 			setCell(f, sheet, outRow, colIdx+1, v)
 		}
 		outRow++
 	}
 	f.SetPanes(sheet, &excelize.Panes{Freeze: true, Split: false, XSplit: 0, YSplit: 1, TopLeftCell: "A2", ActivePane: "bottomLeft"})
-	f.AutoFilter(sheet, fmt.Sprintf("A1:I%d", outRow-1), nil)
-	widths := map[string]float64{"A": 52, "B": 28, "C": 34, "D": 24, "E": 34, "F": 34, "G": 18, "H": 44, "I": 18}
-	for col, w := range widths {
-		f.SetColWidth(sheet, col, col, w)
+	f.AutoFilter(sheet, fmt.Sprintf("A1:%s%d", colLetter(len(headers)), outRow-1), nil)
+	f.SetColWidth(sheet, "A", "A", 52)
+	f.SetColWidth(sheet, "B", "B", 28)
+	for i := range tax.Fields {
+		col := colLetter(i + 3)
+		f.SetColWidth(sheet, col, col, 30)
 	}
 	return nil
 }
 
-func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error {
+func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
 	sheet := "Family Naming Review"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -489,9 +645,14 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 	if len(rows) < 1 {
 		return nil
 	}
-	headerMap := map[string]int{}
-	for i, h := range rows[0] {
-		headerMap[h] = i
+	// This sheet only produces rows for taxonomies that use the conventional
+	// device_type/device_family keys — it's an optional, Ovahol-shaped
+	// consistency audit, not something every taxonomy needs. A taxonomy
+	// without device_family (or without either key) just gets an empty sheet.
+	layout := newDeviceSheetLayout(tax)
+	typeCol, famCol := layout.fieldCol[FieldDeviceType], layout.fieldCol[FieldDeviceFamily]
+	if typeCol == 0 || famCol == 0 {
+		return nil
 	}
 	type agg struct {
 		count     int
@@ -505,14 +666,8 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 	grouped := map[string]*agg{}
 	keyFor := func(t, fam string) string { return t + "\x00" + fam }
 	for _, row := range rows[1:] {
-		get := func(key string) string {
-			if idx, ok := headerMap[key]; ok && idx < len(row) {
-				return row[idx]
-			}
-			return ""
-		}
-		dt := get("Device type")
-		fam := get("Device family")
+		dt := colAt(row, typeCol)
+		fam := colAt(row, famCol)
 		if dt == "" || fam == "" {
 			continue
 		}
@@ -522,19 +677,13 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 		}
 		a := grouped[k]
 		a.count++
-		if v := get("Name"); v != "" {
+		if v := colAt(row, 1); v != "" {
 			a.common[v] = true
 		}
-		if v := get("Canonical device name"); v != "" {
-			a.canonical[v] = true
-		}
-		if v := get("Common names"); v != "" {
-			a.aliases[v] = true
-		}
-		if v := get("Source device type"); v != "" {
+		if v := colAt(row, layout.sourceCol); v != "" {
 			a.sources[v] = true
 		}
-		if v := get("Legacy source name"); v != "" && !a.legacySet[v] {
+		if v := colAt(row, layout.legacyCol); v != "" && !a.legacySet[v] {
 			a.legacySet[v] = true
 			a.legacy = append(a.legacy, v)
 		}
@@ -594,7 +743,7 @@ func rebuildFamilyNamingReviewSheet(f *excelize.File, devicesSheet string) error
 	return nil
 }
 
-func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error {
+func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string, tax *Taxonomy) error {
 	sheet := "Family Naming Audit"
 	if idx, err := f.GetSheetIndex(sheet); err == nil {
 		_ = idx
@@ -617,39 +766,30 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 	if len(rows) < 1 {
 		return nil
 	}
-	headerMap := map[string]int{}
-	for i, h := range rows[0] {
-		headerMap[h] = i
-	}
+	// Same optional-sheet caveat as rebuildFamilyNamingReviewSheet: only
+	// meaningful for taxonomies using the conventional device_type/
+	// device_family keys.
+	layout := newDeviceSheetLayout(tax)
+	typeCol, famCol := layout.fieldCol[FieldDeviceType], layout.fieldCol[FieldDeviceFamily]
 	type agg struct {
 		common, canonical, aliases map[string]bool
 	}
 	grouped := map[string]*agg{}
-	for _, row := range rows[1:] {
-		get := func(key string) string {
-			if idx, ok := headerMap[key]; ok && idx < len(row) {
-				return row[idx]
+	if typeCol != 0 && famCol != 0 {
+		for _, row := range rows[1:] {
+			dt := colAt(row, typeCol)
+			fam := colAt(row, famCol)
+			if dt == "" || fam == "" {
+				continue
 			}
-			return ""
-		}
-		dt := get("Device type")
-		fam := get("Device family")
-		if dt == "" || fam == "" {
-			continue
-		}
-		k := dt + "\x00" + fam
-		if _, ok := grouped[k]; !ok {
-			grouped[k] = &agg{common: map[string]bool{}, canonical: map[string]bool{}, aliases: map[string]bool{}}
-		}
-		a := grouped[k]
-		if v := get("Name"); v != "" {
-			a.common[v] = true
-		}
-		if v := get("Canonical device name"); v != "" {
-			a.canonical[v] = true
-		}
-		if v := get("Common names"); v != "" {
-			a.aliases[v] = true
+			k := dt + "\x00" + fam
+			if _, ok := grouped[k]; !ok {
+				grouped[k] = &agg{common: map[string]bool{}, canonical: map[string]bool{}, aliases: map[string]bool{}}
+			}
+			a := grouped[k]
+			if v := colAt(row, 1); v != "" {
+				a.common[v] = true
+			}
 		}
 	}
 	familiesTotal := len(grouped)
@@ -690,26 +830,21 @@ func rebuildFamilyNamingAuditSheet(f *excelize.File, devicesSheet string) error 
 	return nil
 }
 
-// applyValidations wires an Excel dropdown for each of the Devices sheet's 4
-// conventional columns (B–E) to its Lookups column, for whichever of those
-// fields the taxonomy actually declares allowed values for — a taxonomy
-// missing one (or all) of them just doesn't get a dropdown there.
+// applyValidations wires an Excel dropdown for every Devices sheet field
+// column to its Lookups column, for every field the taxonomy declares
+// allowed values for — however many dimensions it has, not just the 4
+// conventional ones.
 func applyValidations(f *excelize.File, sheet string, maxRow int, tax *Taxonomy, lookupCol map[string]string) error {
-	devicesCol := map[string]string{
-		FieldDeviceType:            "B",
-		FieldDeviceCategory:        "C",
-		FieldDeviceFunction:        "D",
-		FieldDeviceApplicationRisk: "E",
-	}
-	for key, dCol := range devicesCol {
-		lCol, ok := lookupCol[key]
+	layout := newDeviceSheetLayout(tax)
+	for _, fd := range tax.Fields {
+		if len(fd.AllowedValues) == 0 {
+			continue
+		}
+		lCol, ok := lookupCol[fd.Key]
 		if !ok {
 			continue
 		}
-		fd := tax.Field(key)
-		if fd == nil || len(fd.AllowedValues) == 0 {
-			continue
-		}
+		dCol := colLetter(layout.fieldCol[fd.Key])
 		dv := excelize.NewDataValidation(true)
 		dv.SetSqref(fmt.Sprintf("%s2:%s%d", dCol, dCol, maxRow))
 		dv.SetSqrefDropList(fmt.Sprintf("Lookups!$%s$2:$%s$%d", lCol, lCol, len(fd.AllowedValues)+1))
@@ -726,10 +861,6 @@ func writeAPIImportCSV(f *excelize.File, devicesSheet, outputPath string, tax *T
 	if len(rows) < 1 {
 		return "", nil
 	}
-	headerMap := map[string]int{}
-	for i, h := range rows[0] {
-		headerMap[h] = i
-	}
 	csvPath := strings.TrimSuffix(outputPath, filepath.Ext(outputPath)) + ".api_import.csv"
 	file, err := os.Create(csvPath)
 	if err != nil {
@@ -737,25 +868,31 @@ func writeAPIImportCSV(f *excelize.File, devicesSheet, outputPath string, tax *T
 	}
 	defer file.Close()
 	w := csv.NewWriter(file)
-	w.Write(DefaultAPIImportHeaders)
+	w.Write(apiImportHeaders(tax))
+	layout := newDeviceSheetLayout(tax)
 	seen := map[string]bool{}
 	for _, row := range rows[1:] {
-		get := func(key string) string {
-			if idx, ok := headerMap[key]; ok && idx < len(row) {
-				return strings.TrimSpace(row[idx])
-			}
-			return ""
-		}
-		values := []string{
-			get("Name"),
-			get("Device type"),
-			get("Device function"),
-			get("Device application risk"),
-			get("EMDN code"),
-			get("EMDN term"),
-		}
-		if values[0] == "" || values[1] == "" || values[2] == "" || values[3] == "" {
+		name := colAt(row, 1)
+		if name == "" {
 			continue
+		}
+		values := []string{name}
+		requiredOK := true
+		for _, fd := range tax.Fields {
+			v := colAt(row, layout.fieldCol[fd.Key])
+			values = append(values, v)
+			if fd.Required && v == "" {
+				requiredOK = false
+			}
+		}
+		if !requiredOK {
+			continue
+		}
+		if !layout.emdnCodeIsField {
+			values = append(values, colAt(row, layout.emdnCodeCol))
+		}
+		if !layout.emdnTermIsField {
+			values = append(values, colAt(row, layout.emdnTermCol))
 		}
 		key := strings.Join(values, "\x00")
 		if seen[key] {
@@ -816,11 +953,11 @@ func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) 
 		return "", fmt.Errorf("no sheets in workbook")
 	}
 	firstSheet := sheets[0]
-	rows, _, err := extractDeviceRows(f, firstSheet)
+	rows, extraHeaders, err := extractDeviceRows(f, firstSheet)
 	if err != nil {
 		return "", err
 	}
-	devicesSheet, err := rebuildDevicesSheet(f, firstSheet, rows, tax)
+	devicesSheet, err := rebuildDevicesSheet(f, firstSheet, rows, extraHeaders, tax)
 	if err != nil {
 		return "", err
 	}
@@ -840,10 +977,10 @@ func NormalizeWorkbookWithTaxonomy(inputPath, outputPath string, tax *Taxonomy) 
 	if err := rebuildCommonNameMappingReviewSheet(f, devicesSheet, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildFamilyNamingReviewSheet(f, devicesSheet); err != nil {
+	if err := rebuildFamilyNamingReviewSheet(f, devicesSheet, tax); err != nil {
 		return "", err
 	}
-	if err := rebuildFamilyNamingAuditSheet(f, devicesSheet); err != nil {
+	if err := rebuildFamilyNamingAuditSheet(f, devicesSheet, tax); err != nil {
 		return "", err
 	}
 	// validations on Devices sheet
