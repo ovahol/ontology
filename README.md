@@ -68,7 +68,7 @@ Load it with `ontology.LoadTaxonomyFile("acme.json")`. A vendor with two dimensi
 
 Rules also support `source_types` (match against the normalized source type instead of/alongside keywords), `exclude_keywords`, and `name` / `canonical_name` (to assign the device's display name directly instead of deriving it from the legacy text). See [`taxonomy_version.go`](./taxonomy_version.go) for the full `Rule`/`FieldDef` shapes, and [`examples/taxonomies/ovahol.json`](./examples/taxonomies/ovahol.json) for a taxonomy with ~290 rules across 5 dimensions as a fully worked example.
 
-If none of a field's rules fire but the taxonomy declares `allowed_values` for it, the engine tries one more thing for free: matching the normalized source type directly against those allowed values. This is why the MeDevIS default taxonomy — which has zero rules — still classifies anything whose source type happens to already be one of its 39 device type names.
+If none of a field's rules fire but the taxonomy declares `allowed_values` for it, the engine tries one more thing for free: matching the normalized source type directly against those allowed values. This is why the MeDevIS default taxonomy also classifies anything whose source type happens to already be one of its 39 device type names — even though its exact-name rules already reconcile every known device.
 
 ## Result shape
 

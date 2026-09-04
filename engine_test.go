@@ -1,7 +1,11 @@
 package ontology
 
 import (
+	"os"
+	"strings"
 	"testing"
+
+	"github.com/xuri/excelize/v2"
 )
 
 func TestEngineWithOvaholTaxonomy(t *testing.T) {
@@ -38,6 +42,72 @@ func TestEngineWithMedevisTaxonomy(t *testing.T) {
 	if result.Confidence == "none" || result.DeviceType != "Radiotherapy-related equipment" {
 		t.Errorf("expected valid classification from medevis taxonomy, got %+v", result)
 	}
+}
+
+// TestMeDevisDefaultReconciliation proves the embedded default (MeDevIS)
+// taxonomy reconciles every real MeDevIS row to its exact (device_type,
+// service_type, knowledge_level, reusable) tuple by device name alone — the
+// same migration guarantee the Ovahol dictionary test gives, but for a
+// genuinely different vendor whose vocabulary sits in its own field keys.
+// It reads the reference devices.xlsx, so it is skipped when that (gitignored,
+// local-only) file is absent.
+func TestMeDevisDefaultReconciliation(t *testing.T) {
+	if _, err := os.Stat("devices.xlsx"); err != nil {
+		t.Skip("devices.xlsx not present; skipping local MeDevIS reconciliation")
+	}
+	tax := DefaultTaxonomy()
+	f, err := excelize.OpenFile("devices.xlsx")
+	if err != nil {
+		t.Fatalf("open devices.xlsx: %v", err)
+	}
+	defer f.Close()
+	rows, err := f.GetRows(f.GetSheetList()[0])
+	if err != nil {
+		t.Fatalf("read sheet: %v", err)
+	}
+	count := 0
+	dup := map[string]int{}
+	for _, r := range rows {
+		if len(r) == 0 || strings.TrimSpace(r[0]) == "" {
+			continue
+		}
+		dup[strings.TrimSpace(r[0])]++
+	}
+	for i, r := range rows {
+		if i == 0 || len(r) == 0 {
+			continue
+		}
+		name := strings.TrimSpace(r[0])
+		if name == "" {
+			continue
+		}
+		// Names that appear more than once in the source carry conflicting
+		// tuples; the taxonomy collapses each to one (most common) tuple, so
+		// per-row comparison is only meaningful for unique names.
+		if dup[name] > 1 {
+			continue
+		}
+		res := NormalizeWithTaxonomy(Input{DeviceName: name}, tax)
+		got := [4]string{
+			res.GetField("device_type"),
+			res.GetField("service_type"),
+			res.GetField("knowledge_level"),
+			res.GetField("reusable"),
+		}
+		want := [4]string{
+			strings.TrimSpace(r[4]), strings.TrimSpace(r[5]),
+			strings.TrimSpace(r[6]), strings.TrimSpace(r[2]),
+		}
+		if got != want {
+			t.Errorf("row %d %q -> %v, want %v (source=%s)", i, name, got, want, res.MappingSource)
+			continue
+		}
+		count++
+	}
+	if count == 0 {
+		t.Fatal("no rows reconciled")
+	}
+	t.Logf("reconciled %d MeDevIS rows", count)
 }
 
 // TestEngineWithCustomVendorRules exercises a vendor whose taxonomy has a
@@ -158,6 +228,15 @@ func TestEngineWithCatalogOverride(t *testing.T) {
 	}
 	if res.Confidence != "high" {
 		t.Errorf("expected Confidence 'high', got %q", res.Confidence)
+	}
+	// The catalog only declares device_type; the engine must NOT invent
+	// other dimensions (e.g. device_category) from some other vendor's
+	// vocabulary. A catalog hit is returned verbatim.
+	if got := res.GetField(FieldDeviceCategory); got != "" {
+		t.Errorf("engine invented a category (%q) the catalog did not declare", got)
+	}
+	if res.Fields == nil || len(res.Fields) != 1 {
+		t.Errorf("expected exactly the catalog's single field, got %+v", res.Fields)
 	}
 }
 

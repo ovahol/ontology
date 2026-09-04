@@ -62,6 +62,28 @@ domain into Ovahol's dimensions to participate. That's fixed now:
   it explicitly from `examples/taxonomies/ovahol.json` (or your own copy)
   instead.
 
+### Corrected — the embedded MeDevIS default taxonomy now uses MeDevIS's own structure
+
+The default taxonomy (embedded in `default.go`, source `devices.xlsx`) had been
+forced into Ovahol's field shape: MeDevIS's real "Knowledge level" column
+(Basic/General clinical/Specialized clinical) was mislabeled `device_function`,
+and its "Reusable" column (Reusable/Single use) was mislabeled
+`device_application_risk`. `examples/taxonomies/medevis.json` is regenerated
+from the reference `devices.xlsx` (2653 rows) with MeDevIS's real dimensions:
+
+- `device_type` (39) — required — the "Device type" column
+- `service_type` (12) — the "Service type" column
+- `knowledge_level` (3) — the "Knowledge level" column
+- `reusable` (2) — the "Reusable" column
+- `emdn_code` / `emdn_term` / `gmdn_code` / `gmdn_term` (nomenclature lookups)
+
+It now ships 2649 exact-name inference rules (one per distinct device name,
+longest first) that reconcile every known MeDevIS device to its exact tuple —
+verified by `TestMeDevisDefaultReconciliation`, which reconciles all 2645
+unique-name rows from the reference file. EMDN codes are deliberately not used
+for classification (a single EMDN code maps to several distinct tuples). New
+generator: `cmd/gen-medevis-taxonomy`.
+
 ## [0.2.0] - 2026-09-03
 
 ### Added

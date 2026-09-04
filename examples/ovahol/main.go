@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/ovahol/ontology"
 )
@@ -75,9 +76,17 @@ func main() {
 
 	for _, c := range inputs {
 		result := ontology.NormalizeWithCatalogAndTaxonomy(c.in, cat, tax)
+		// The engine returns catalog hits verbatim (system-agnostic: it does
+		// not invent dimensions the catalog lacks). Ovahol's own function->
+		// category vocabulary is a vendor concern, so the ovahol layer derives
+		// it explicitly here when the dictionary row did not carry it.
+		category := result.DeviceCategory
+		if category == "" && strings.TrimSpace(result.DeviceFunction) != "" {
+			category = ontology.CategoryForFunctionFor(result.DeviceFunction, tax)
+		}
 		rec := ApplyUnknownConventions(result.Name, c.model, c.brand, c.mfr, result.EMDNCode, result.EMDNTerm)
 		rec.DeviceType = result.DeviceType
-		rec.DeviceCategory = result.DeviceCategory
+		rec.DeviceCategory = category
 		rec.DeviceFunction = result.DeviceFunction
 		rec.ApplicationRisk = result.DeviceApplicationRisk
 		rec.MappingSource = result.MappingSource

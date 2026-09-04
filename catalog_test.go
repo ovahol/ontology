@@ -200,3 +200,64 @@ func TestCatalogPrefersNameOverCollidingEMDN(t *testing.T) {
 		t.Fatalf("name should win over colliding EMDN, got: %+v", r)
 	}
 }
+
+func TestCatalogFuzzyMatch(t *testing.T) {
+	cat := NewInMemoryCatalog([]CatalogEntry{
+		{
+			Name: "Multiparametric basic patient monitor",
+			Fields: map[string]string{
+				"device_type":             "Monitoring & Measurement Devices",
+				"device_function":         "Additional Physiological Monitoring and Diagnostic",
+				"device_application_risk": "Inappropriate therapy or misdiagnosis",
+			},
+		},
+		{
+			Name: "Infusion pump",
+			Fields: map[string]string{
+				"device_type":             "Treatment, Surgical & Life Support Devices",
+				"device_function":         "Surgical and Intensive Care",
+				"device_application_risk": "Potential patient or operator injury",
+			},
+		},
+	})
+
+	cases := []struct {
+		query    string
+		wantName string
+		wantType string
+	}{
+		{"Multiparametric basic patient moniter", "Multiparametric basic patient monitor", "Monitoring & Measurement Devices"},   // transposed letter
+		{"Infusion pumpp", "Infusion pump", "Treatment, Surgical & Life Support Devices"},                                        // extra char
+	}
+	for _, tc := range cases {
+		r := NormalizeWithCatalog(Input{DeviceName: tc.query}, cat)
+		if r.MappingSource != "catalog_fuzzy" {
+			t.Errorf("query %q: source=%q, want catalog_fuzzy (got %+v)", tc.query, r.MappingSource, r)
+			continue
+		}
+		if r.Confidence != "medium" {
+			t.Errorf("query %q: confidence=%q, want medium", tc.query, r.Confidence)
+		}
+		if r.Name != tc.wantName || r.DeviceType != tc.wantType {
+			t.Errorf("query %q: matched (%s|%s), want (%s|%s)", tc.query, r.Name, r.DeviceType, tc.wantName, tc.wantType)
+		}
+	}
+}
+
+func TestCatalogFuzzyRejectsUnrelated(t *testing.T) {
+	cat := NewInMemoryCatalog([]CatalogEntry{
+		{Name: "Infusion pump", Fields: map[string]string{"device_type": "Treatment"}},
+		{Name: "Chemical analyzer", Fields: map[string]string{"device_type": "Laboratory"}},
+		{Name: "Pulse oximeter", Fields: map[string]string{"device_type": "Monitoring"}},
+		{Name: "Surgical scalpel", Fields: map[string]string{"device_type": "Surgical"}},
+		{Name: "ECG machine", Fields: map[string]string{"device_type": "Monitoring"}},
+	})
+	// A garbled, unrelated name must NOT be pulled to a fuzzy catalog hit.
+	r := NormalizeWithCatalog(Input{DeviceName: "Plasma rubber harness clamp fixture"}, cat)
+	if r.MappingSource == "catalog_fuzzy" {
+		t.Fatalf("unrelated name should not fuzzy-match, got %+v", r)
+	}
+	if r.MappingSource == "" {
+		t.Fatalf("expected taxonomy fallback to set a mapping source, got %+v", r)
+	}
+}

@@ -68,8 +68,11 @@
 //	  "mapping_source": "family_fallback"
 //	}
 //
-// The controlled vocabulary (device_type, device_category, device_function,
-// device_application_risk, plus any vendor-defined fields via the Fields map)
-// is entirely determined by the vendor taxonomy. No free-text leaks into the
-// controlled fields.
+// The controlled vocabulary is entirely determined by the vendor taxonomy —
+// no dimension (device_type, service_type, knowledge_level, reusable, or any
+// vendor-defined key) is special to the engine, and no free-text leaks into
+// the controlled fields. The embedded default taxonomy derives its own
+// dimensions from the WHO MeDevIS reference (device_type, service_type,
+// knowledge_level, reusable, plus EMDN/GMDN lookups); a vendor like Ovahol
+// declares its own instead.
 package ontology

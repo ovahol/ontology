@@ -147,6 +147,71 @@ func (c *InMemoryCatalog) Find(input Input) (*CatalogEntry, bool) {
 	return nil, false
 }
 
+// CatalogApprox is an optional richness on Catalog that adds typo-tolerant
+// lookup. A Catalog that supports it lets normalization distinguish an exact
+// match (high confidence) from a fuzzy one (medium confidence). Callers that
+// pass a plain Catalog get exact matching only.
+type CatalogApprox interface {
+	// FindApprox returns the best typo-tolerant match for the input's device
+	// name / EMDN term, its similarity score in [0,1], and whether one was
+	// found. It is only consulted after an exact Find misses.
+	FindApprox(input Input) (entry *CatalogEntry, score float64, ok bool)
+}
+
+// FindApprox implements CatalogApprox: it scans candidate names and EMDN
+// terms for the closest typo-tolerant match to the input's name/term, above a
+// quality threshold. Exact (pre-indexed) lookup is intentionally not used here
+// — callers should run Find first.
+func (c *InMemoryCatalog) FindApprox(input Input) (*CatalogEntry, float64, bool) {
+	if c == nil || len(c.entries) == 0 {
+		return nil, 0, false
+	}
+	queryName := Normalized(input.DeviceName)
+	queryTerm := Normalized(input.EMDNTerm)
+	if queryName == "" && queryTerm == "" {
+		return nil, 0, false
+	}
+	bestIdx := -1
+	bestScore := 0.0
+	for i := range c.entries {
+		e := &c.entries[i]
+		if queryName != "" {
+			if sc := scoreAgainst(queryName, e.Name); sc > bestScore {
+				bestScore = sc
+				bestIdx = i
+			}
+		}
+		if queryTerm != "" && e.EMDNTerm != "" {
+			if sc := scoreAgainst(queryTerm, e.EMDNTerm); sc > bestScore {
+				bestScore = sc
+				bestIdx = i
+			}
+		}
+	}
+	if bestIdx < 0 || bestScore < 0.70 {
+		return nil, 0, false
+	}
+	e := c.entries[bestIdx]
+	return &e, bestScore, true
+}
+
+// scoreAgainst returns fuzzyScore when the pair passes the name-quality gate,
+// else 0.
+func scoreAgainst(query, candidate string) float64 {
+	if query == "" || candidate == "" {
+		return 0
+	}
+	q := strings.Fields(query)
+	c := strings.Fields(Normalized(candidate))
+	if len(q) == 0 || len(c) == 0 {
+		return 0
+	}
+	if len(query) < 4 {
+		return 0
+	}
+	return fuzzyScore(q, c)
+}
+
 // NormalizeWithCatalog is like Normalize but consults cat first.
 //
 // Deprecated: use NormalizeWithCatalogAndTaxonomy.
@@ -156,42 +221,51 @@ func NormalizeWithCatalog(input Input, cat Catalog) Result {
 
 // NormalizeWithCatalogAndTaxonomy is the vocab-less catalog entry point.
 // It returns the catalog entry verbatim when matched (MappingSource=
-// "catalog_exact", Confidence="high"); otherwise it falls back to taxonomy
-// inference.
+// "catalog_exact", Confidence="high", or "catalog_fuzzy"/"medium" for a
+// typo-tolerant match); otherwise it falls back to taxonomy inference.
 func NormalizeWithCatalogAndTaxonomy(input Input, cat Catalog, tax *Taxonomy) Result {
 	if cat != nil {
 		if entry, ok := cat.Find(input); ok && entry != nil {
-			// Start from the catalog's own fields (any vendor dimensions),
-			// then fill the Ovahol-style deprecated fixed fields if present.
-			fields := make(map[string]string, len(entry.Fields)+1)
-			for k, v := range entry.Fields {
-				fields[k] = v
-			}
-			// Derive category from function via the taxonomy rules (a generic
-			// function->category derivation) when the entry did not carry it.
-			if fields[FieldDeviceCategory] == "" {
-				if cat := CategoryForFunctionFor(entry.DeviceFunction(), tax); cat != "" {
-					fields[FieldDeviceCategory] = cat
-				}
-			}
-			return Result{
-				Name:                  entry.Name,
-				Fields:                fields,
-				DeviceType:            fields[FieldDeviceType],
-				DeviceCategory:        fields[FieldDeviceCategory],
-				DeviceFunction:        fields[FieldDeviceFunction],
-				DeviceApplication:     fields[FieldDeviceFunction],
-				DeviceApplicationRisk: fields[FieldDeviceApplicationRisk],
-				LegacySourceName:      input.DeviceName,
-				SourceType:            input.SourceType,
-				EMDNCode:              firstNonEmpty(input.EMDNCode, entry.EMDNCode),
-				EMDNTerm:              firstNonEmpty(input.EMDNTerm, entry.EMDNTerm),
-				MappingSource:         "catalog_exact",
-				Confidence:            "high",
+			return resultFromCatalogEntry(input, entry, "catalog_exact", "high")
+		}
+		// Typo-tolerant fallback: only when the Catalog opts in, after an
+		// exact miss. A fuzzy hit is lower confidence than an exact one but
+		// still reconciles to the correct dictionary row.
+		if approx, ok := cat.(CatalogApprox); ok {
+			if entry, _, ok := approx.FindApprox(input); ok && entry != nil {
+				return resultFromCatalogEntry(input, entry, "catalog_fuzzy", "medium")
 			}
 		}
 	}
 	return NormalizeWithTaxonomy(input, tax)
+}
+
+// resultFromCatalogEntry builds a Result from a matched catalog entry. It is a
+// faithful copy of the entry's own fields (any vendor dimensions) — the engine
+// does not invent or derive dimensions the catalog does not declare. Vendors
+// that have a cross-field derivation (e.g. an ovahol function->category
+// vocabulary) do it themselves with DeriveFieldFor/CategoryForFunctionFor; the
+// catalog path stays system-agnostic and returns the row verbatim.
+func resultFromCatalogEntry(input Input, entry *CatalogEntry, mappingSource, confidence string) Result {
+	fields := make(map[string]string, len(entry.Fields)+1)
+	for k, v := range entry.Fields {
+		fields[k] = v
+	}
+	return Result{
+		Name:                  entry.Name,
+		Fields:                fields,
+		DeviceType:            fields[FieldDeviceType],
+		DeviceCategory:        fields[FieldDeviceCategory],
+		DeviceFunction:        fields[FieldDeviceFunction],
+		DeviceApplication:     fields[FieldDeviceFunction],
+		DeviceApplicationRisk: fields[FieldDeviceApplicationRisk],
+		LegacySourceName:      input.DeviceName,
+		SourceType:            input.SourceType,
+		EMDNCode:              firstNonEmpty(input.EMDNCode, entry.EMDNCode),
+		EMDNTerm:              firstNonEmpty(input.EMDNTerm, entry.EMDNTerm),
+		MappingSource:         mappingSource,
+		Confidence:            confidence,
+	}
 }
 
 // NormalizeBatchWithCatalog is the batch analogue.
